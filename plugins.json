@@ -1,0 +1,21 @@
+[
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=filman.cc&sz=%size%",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/ggcenter/StreamhubPlugins",
+        "fileSize": 24013,
+        "status": 1,
+        "authors": [
+            "Streamhub"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 1,
+        "internalName": "StreamhubProvider",
+        "description": "Watch content from Streamhub",
+        "url": "https://raw.githubusercontent.com/ggcenter/StreamhubPlugins/builds/StreamhubProvider.cs3",
+        "name": "StreamhubProvider"
+    }
+]
