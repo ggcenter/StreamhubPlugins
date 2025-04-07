@@ -8,9 +8,7 @@ concurrency:
 on:
   push:
     branches:
-      # choose your default branch
       - master
-      - main
     paths-ignore:
       - '*.md'
 
@@ -36,10 +34,10 @@ jobs:
         run: java -version
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: adopt
+          java-version: 11
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
