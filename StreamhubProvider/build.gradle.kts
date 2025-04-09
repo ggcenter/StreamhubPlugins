@@ -1,11 +1,11 @@
 // use an integer for version numbers
-version = 2
+version = 1
 
 cloudstream {
     // All of these properties are optional, you can safely remove any of them.
 
     description = "Watch content from Streamhub"
-    authors = listOf("Luna712")
+    authors = listOf("Streamhub")
 
     /**
      * Status int as one of the following:
@@ -16,6 +16,6 @@ cloudstream {
      **/
     status = 1 // Will be 3 if unspecified
 
-    tvTypes = listOf("Others")
-    iconUrl = "https://www.google.com/s2/favicons?domain=www.Streamhub.com&sz=%size%"
+    tvTypes = listOf("Movie", "TvSeries")
+    iconUrl = "https://www.google.com/s2/favicons?domain=filman.cc&sz=%size%"
 }
