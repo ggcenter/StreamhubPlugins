@@ -118,7 +118,7 @@ class StreamhubProvider : MainAPI() {
         )
     }
 
-    override suspend fun search(query: String): List<SearchResponse>
+    override suspend fun search(query: String): List<SearchResponse> {
         val response = makeApiRequest("search.json")
         val searchResults = tryParseJson<VideoSearchResponse>(response)?.list ?: return emptyList()
         return searchResults.map { it.toSearchResponse(this) }
@@ -127,7 +127,7 @@ class StreamhubProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         // Zakładamy, że url to już samo ID
         val videoId = url
-        val response = makeApiRequest("/data/$videoId.json")
+        val response = makeApiRequest("data/$videoId.json")
         val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return null
         return videoDetail.toLoadResponse(this)
     }
@@ -166,8 +166,8 @@ class StreamhubProvider : MainAPI() {
                 TvType.Movie,
                 this.id
             ) {
-                this.plot = description
-                this.posterUrl = provider.imageBaseUrl + poster_path
+                plot = description
+                posterUrl = provider.imageBaseUrl + poster_path
             }
         } else {
             // Dla seriali
@@ -186,8 +186,8 @@ class StreamhubProvider : MainAPI() {
                     } ?: emptyList()
                 } ?: emptyList()
             ) {
-                this.plot = description
-                this.posterUrl = provider.imageBaseUrl + poster_path
+                plot = description
+                posterUrl = provider.imageBaseUrl + poster_path
             }
         }
     }
@@ -201,7 +201,7 @@ class StreamhubProvider : MainAPI() {
         val isEpisode = data.contains("_")
 
             // Pobierz szablony hostingów
-            val hostsResponse = makeApiRequest("/hosts.json")
+            val hostsResponse = makeApiRequest("hosts.json")
             val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: return false
             val hostMap = hosts.associateBy { it.i }
 
@@ -215,7 +215,7 @@ class StreamhubProvider : MainAPI() {
             val seasonNumber = episodeId.substringAfter("s").substringBefore("e").toIntOrNull() ?: 1
             val episodeNumber = episodeId.substringAfter("e").toIntOrNull() ?: 1
 
-            val response = makeApiRequest("/data/$seriesId.json")
+            val response = makeApiRequest("data/$seriesId.json")
             val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
 
             // Znajdź odpowiedni odcinek
@@ -234,7 +234,7 @@ class StreamhubProvider : MainAPI() {
             }
         } else {
             // Dla filmów - obecna implementacja
-            val response = makeApiRequest("/data/$data.json")
+            val response = makeApiRequest("data/$data.json")
             val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
 
             // Ładuj linki dla filmu
