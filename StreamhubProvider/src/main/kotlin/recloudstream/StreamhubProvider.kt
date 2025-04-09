@@ -51,16 +51,16 @@ class StreamhubProvider : MainAPI() {
         val h: String
     )
 
-    data class VideoSearchResponse(
-        val list: List<VideoItem>
-    )
-
     data class VideoItem(
         val id: String,
         val title: String,
         val type: String,
         @Suppress("PropertyName")
         val poster_path: String
+    )
+
+    data class VideoSearchResponse(
+        val list: List<VideoItem>
     )
 
     data class VideoDetailResponse(
@@ -118,7 +118,7 @@ class StreamhubProvider : MainAPI() {
         )
     }
 
-    override suspend fun search(query: String): List<SearchResponse> {
+    override suspend fun search(query: String): List<SearchResponse>
         val response = makeApiRequest("search.json")
         val searchResults = tryParseJson<VideoSearchResponse>(response)?.list ?: return emptyList()
         return searchResults.map { it.toSearchResponse(this) }
@@ -166,8 +166,8 @@ class StreamhubProvider : MainAPI() {
                 TvType.Movie,
                 this.id
             ) {
-                plot = this.description
-                posterUrl = provider.imageBaseUrl + this.poster_path
+                this.plot = description
+                this.posterUrl = provider.imageBaseUrl + poster_path
             }
         } else {
             // Dla seriali
@@ -186,8 +186,8 @@ class StreamhubProvider : MainAPI() {
                     } ?: emptyList()
                 } ?: emptyList()
             ) {
-                plot = this.description
-                posterUrl = provider.imageBaseUrl + this.poster_path
+                this.plot = description
+                this.posterUrl = provider.imageBaseUrl + poster_path
             }
         }
     }
