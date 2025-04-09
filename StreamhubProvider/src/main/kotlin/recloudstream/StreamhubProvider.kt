@@ -16,6 +16,9 @@ import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.newTvSeriesLoadResponse
+import com.lagradost.cloudstream3.newTvSeriesSearchResponse
+import com.lagradost.cloudstream3.Episode as CSEpisode
 
 class StreamhubProvider : MainAPI() {
 
@@ -130,13 +133,27 @@ class StreamhubProvider : MainAPI() {
     }
 
     private fun VideoItem.toSearchResponse(provider: StreamhubProvider): SearchResponse {
+        // Określenie typu na podstawie pola type
         val tvType = if (this.type == "movie") TvType.Movie else TvType.TvSeries
-        return provider.newMovieSearchResponse(
-            this.title,
-            this.id, // Przekazujesz samo ID
-            tvType
-        ) {
-            this.posterUrl = provider.imageBaseUrl + this.poster_path
+
+        return if (this.type == "movie") {
+            // Dla filmów
+            provider.newMovieSearchResponse(
+                this.title,
+                this.id,
+                tvType
+            ) {
+                this.posterUrl = provider.imageBaseUrl + this.poster_path
+            }
+        } else {
+            // Dla seriali
+            provider.newTvSeriesSearchResponse(
+                this.title,
+                this.id,
+                tvType
+            ) {
+                this.posterUrl = provider.imageBaseUrl + this.poster_path
+            }
         }
     }
 
@@ -149,7 +166,7 @@ class StreamhubProvider : MainAPI() {
                 TvType.Movie,
                 this.id
             ) {
-                plot = description
+                plot = this.description
                 posterUrl = provider.imageBaseUrl + this.poster_path
             }
         } else {
@@ -160,7 +177,7 @@ class StreamhubProvider : MainAPI() {
                 TvType.TvSeries,
                 this.seasons?.flatMap { season ->
                     season.episodes?.map { episode ->
-                        Episode(
+                        CSEpisode(
                             "${this.id}_${episode.id}",
                             episode.name,
                             season.season,
@@ -169,7 +186,7 @@ class StreamhubProvider : MainAPI() {
                     } ?: emptyList()
                 } ?: emptyList()
             ) {
-                plot = description
+                plot = this.description
                 posterUrl = provider.imageBaseUrl + this.poster_path
             }
         }
