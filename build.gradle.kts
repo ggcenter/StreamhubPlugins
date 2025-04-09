@@ -44,7 +44,7 @@ subprojects {
             minSdk = 21
             compileSdkVersion(34)
             targetSdk = 34
-            multiDexEnabled true
+            multiDexEnabled = true
         }
 
         dexOptions {
