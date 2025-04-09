@@ -40,7 +40,7 @@ subprojects {
     }
 
     android {
-        defaultConfig {
+       defaultConfig {
             minSdk = 21
             compileSdkVersion(34)
             targetSdk = 34
@@ -48,7 +48,7 @@ subprojects {
         }
 
         dexOptions {
-            javaMaxHeapSize("4g")
+            javaMaxHeapSize = "4g"
             preDexLibraries = false
         }
 
