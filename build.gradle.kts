@@ -40,7 +40,6 @@ subprojects {
     }
 
     android {
-        namespace 'com.example'
         defaultConfig {
             minSdk = 21
             compileSdkVersion(34)
