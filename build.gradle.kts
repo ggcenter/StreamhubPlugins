@@ -48,7 +48,7 @@ subprojects {
         }
 
         dexOptions {
-            javaMaxHeapSize "4g"
+            javaMaxHeapSize("4g")
             preDexLibraries = false
         }
 
@@ -84,7 +84,7 @@ subprojects {
         implementation("org.jsoup:jsoup:1.16.2") // html parser
         implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.16.0")
         implementation("com.fasterxml.jackson.core:jackson-databind:2.16.0")
-        implementation('androidx.multidex:multidex:2.0.1')
+        implementation("androidx.multidex:multidex:2.0.1")
     }
 }
 
