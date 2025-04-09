@@ -66,8 +66,8 @@ class StreamhubProvider : MainAPI() {
     data class VideoDetailResponse(
         val id: String,
         val title: String,
-        val poster_path: String? = null,
         val type: String,
+        val description: String? = null,
         val poster_path: String? = null,
         val streams: List<Stream>? = null,
         val seasons: List<Season>? = null
@@ -163,8 +163,10 @@ class StreamhubProvider : MainAPI() {
                 TvType.Movie,
                 this.id
             ) {
-                this.plot = this@toLoadResponse.description
-                this.posterUrl = provider.imageBaseUrl + this@toLoadResponse.poster_path // [2]
+                this.plot = this@toLoadResponse.description  // Teraz działa
+                this.posterUrl = this@toLoadResponse.poster_path?.let {
+                    provider.imageBaseUrl + it
+                }
             }
         } else {
             // Dla seriali
@@ -183,8 +185,10 @@ class StreamhubProvider : MainAPI() {
                     } ?: emptyList()
                 } ?: emptyList()
             ) {
-                this.plot = this@toLoadResponse.description
-                this.posterUrl = provider.imageBaseUrl + this@toLoadResponse.poster_path // [2]
+                this.plot = this@toLoadResponse.description  // Teraz działa
+                this.posterUrl = this@toLoadResponse.poster_path?.let {
+                    provider.imageBaseUrl + it
+                }
             }
         }
     }
@@ -209,9 +213,11 @@ class StreamhubProvider : MainAPI() {
             val episodeId = parts[1] // format "sXeY"
 
             // Wyciągnij numer sezonu i odcinka z episodeId
-              val (seasonPart, episodePart) = episodeId.split("e")
-              val seasonNumber = seasonPart.substring(1).toIntOrNull() ?: 1
-              val episodeNumber = episodePart.toIntOrNull() ?: 1
+            val (seasonPart, episodePart) = episodeId.split("e").takeIf {
+                it.size == 2
+            } ?: return false
+            val seasonNumber = seasonPart.substring(1).toIntOrNull() ?: 1
+            val episodeNumber = episodePart.toIntOrNull() ?: 1
 
             val response = makeApiRequest("data/$seriesId.json")
             val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
