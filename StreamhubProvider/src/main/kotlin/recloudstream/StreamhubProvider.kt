@@ -66,9 +66,9 @@ class StreamhubProvider : MainAPI() {
     data class VideoDetailResponse(
         val id: String,
         val title: String,
-        val description: String,
+        val poster_path: String? = null,
         val type: String,
-        val poster_path: String,
+        val poster_path: String? = null,
         val streams: List<Stream>? = null,
         val seasons: List<Season>? = null
     )
@@ -78,7 +78,7 @@ class StreamhubProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     private val imageBaseUrl = "https://image.tmdb.org/t/p/w500"
-    private val randomString = getRandomString()
+    private val randomString = this.getRandomString()
     private val githubRawBaseUrl = "https://raw.githubusercontent.com/ggcenter/streamhub/refs/heads/main/public/github"
 
     override var lang = "pl"
@@ -133,29 +133,26 @@ class StreamhubProvider : MainAPI() {
     }
 
     private fun VideoItem.toSearchResponse(provider: StreamhubProvider): SearchResponse {
-        // Określenie typu na podstawie pola type
         val tvType = if (this.type == "movie") TvType.Movie else TvType.TvSeries
-
         return if (this.type == "movie") {
-            // Dla filmów
             provider.newMovieSearchResponse(
                 this.title,
                 this.id,
                 tvType
             ) {
-                this.posterUrl = provider.imageBaseUrl + this.poster_path
+                this.posterUrl = provider.imageBaseUrl + this@toSearchResponse.poster_path // [1]
             }
         } else {
-            // Dla seriali
             provider.newTvSeriesSearchResponse(
                 this.title,
                 this.id,
                 tvType
             ) {
-                this.posterUrl = provider.imageBaseUrl + this.poster_path
+                this.posterUrl = provider.imageBaseUrl + this@toSearchResponse.poster_path // [2]
             }
         }
     }
+
 
     private suspend fun VideoDetailResponse.toLoadResponse(provider: StreamhubProvider): LoadResponse {
         return if (this.type == "movie") {
@@ -166,8 +163,8 @@ class StreamhubProvider : MainAPI() {
                 TvType.Movie,
                 this.id
             ) {
-                plot = description
-                posterUrl = provider.imageBaseUrl + poster_path
+                this.plot = this@toLoadResponse.description
+                this.posterUrl = provider.imageBaseUrl + this@toLoadResponse.poster_path // [2]
             }
         } else {
             // Dla seriali
@@ -186,8 +183,8 @@ class StreamhubProvider : MainAPI() {
                     } ?: emptyList()
                 } ?: emptyList()
             ) {
-                plot = description
-                posterUrl = provider.imageBaseUrl + poster_path
+                this.plot = this@toLoadResponse.description
+                this.posterUrl = provider.imageBaseUrl + this@toLoadResponse.poster_path // [2]
             }
         }
     }
@@ -212,8 +209,9 @@ class StreamhubProvider : MainAPI() {
             val episodeId = parts[1] // format "sXeY"
 
             // Wyciągnij numer sezonu i odcinka z episodeId
-            val seasonNumber = episodeId.substringAfter("s").substringBefore("e").toIntOrNull() ?: 1
-            val episodeNumber = episodeId.substringAfter("e").toIntOrNull() ?: 1
+              val (seasonPart, episodePart) = episodeId.split("e")
+              val seasonNumber = seasonPart.substring(1).toIntOrNull() ?: 1
+              val episodeNumber = episodePart.toIntOrNull() ?: 1
 
             val response = makeApiRequest("data/$seriesId.json")
             val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
@@ -229,8 +227,8 @@ class StreamhubProvider : MainAPI() {
             // Ładuj linki dla odcinka
             episode.streams?.forEach { stream ->
                 val host = hostMap[stream.i] ?: return@forEach
-                val url = host.t.replace("{hashid}", stream.h)
-                loadExtractor(url, subtitleCallback, callback)
+                val url = host.t.replace("{hashid}", stream.h).encodeUri()
+                loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
             }
         } else {
             // Dla filmów - obecna implementacja
@@ -240,8 +238,8 @@ class StreamhubProvider : MainAPI() {
             // Ładuj linki dla filmu
             videoDetail.streams?.forEach { stream ->
                 val host = hostMap[stream.i] ?: return@forEach
-                val url = host.t.replace("{hashid}", stream.h)
-                loadExtractor(url, subtitleCallback, callback)
+                val url = host.t.replace("{hashid}", stream.h).encodeUri()
+                loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
             }
         }
 
