@@ -1,6 +1,5 @@
 package recloudstream
 
-import com.lagradost.api.Log
 import com.lagradost.cloudstream3.HomePageList
 import com.lagradost.cloudstream3.HomePageResponse
 import com.lagradost.cloudstream3.LoadResponse
@@ -88,41 +87,50 @@ class StreamhubProvider : MainAPI() {
     private var searchCache: List<VideoItem>? = null
 
 
-    override suspend fun search(query: String): List<SearchResponse> {
+    private suspend fun makeApiRequest(url: String): String {
         try {
-            Log.d("StreamhubProvider", "Rozpoczęcie wyszukiwania: $query")
+            val fullUrl = "$mainUrl/$url"
+            println("StreamhubProvider: Wykonywanie żądania do: $fullUrl")
 
-            if (searchCache == null) {
-                Log.d("StreamhubProvider", "Cache jest pusty, ładowanie z API")
+            val response = app.get(
+                fullUrl,
+                headers = mapOf("Authorization" to "Bearer $randomString")
+            )
 
-                val response = makeApiRequest("search_catalog.json")
-                Log.d("StreamhubProvider", "Otrzymana odpowiedź API, długość: ${response.length}")
-
-                val parsedResponse = tryParseJson<VideoSearchResponse>(response)
-                if (parsedResponse == null) {
-                    Log.d("StreamhubProvider", "Parsowanie JSON zwróciło null")
-                    return emptyList()
-                }
-
-                searchCache = parsedResponse.list
-                Log.d("StreamhubProvider", "Zapisano ${searchCache?.size ?: 0} elementów w cache")
+            // Sprawdź status HTTP
+            if (!response.isSuccessful) {
+                println("StreamhubProvider: Błąd HTTP: ${response.code}")
+                return ""
             }
 
-            val filtered = searchCache!!.filter { it.name.contains(query, ignoreCase = true) }
-            Log.d("StreamhubProvider", "Po filtrowaniu zostało ${filtered.size} wyników")
-
-            return filtered.map { it.toSearchResponse(this) }
+            return response.text
         } catch (e: Exception) {
-            Log.e("StreamhubProvider", "Błąd w funkcji search: ${e.message}")
-            return emptyList()
+            println("StreamhubProvider: Błąd podczas wykonywania żądania API: ${e.message}")
+            return ""
         }
     }
 
     private suspend fun makeApiRequest(url: String): String {
-        return app.get(
-            "$mainUrl/$url",
-            headers = mapOf("Authorization" to "Bearer $randomString")
-        ).text
+        try {
+            val fullUrl = "$mainUrl/$url"
+            println("StreamhubProvider: Wykonywanie żądania do: $fullUrl")
+
+            val response = app.get(
+                fullUrl,
+                headers = mapOf("Authorization" to "Bearer $randomString")
+            )
+
+            // Sprawdź status HTTP
+            if (!response.isSuccessful) {
+                println("StreamhubProvider: Błąd HTTP: ${response.code}")
+                return ""
+            }
+
+            return response.text
+        } catch (e: Exception) {
+            println("StreamhubProvider: Błąd podczas wykonywania żądania API: ${e.message}")
+            return ""
+        }
     }
 
     private fun getRandomString(): String {
