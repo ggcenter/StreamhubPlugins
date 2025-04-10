@@ -136,7 +136,7 @@ class StreamhubProvider : MainAPI() {
         val tvType = if (this.type == "movie") TvType.Movie else TvType.TvSeries
         return if (this.type == "movie") {
             provider.newMovieSearchResponse(
-                this.title,
+                this.name,
                 this.id,
                 tvType
             ) {
@@ -144,7 +144,7 @@ class StreamhubProvider : MainAPI() {
             }
         } else {
             provider.newTvSeriesSearchResponse(
-                this.title,
+                this.name,
                 this.id,
                 tvType
             ) {
@@ -158,7 +158,7 @@ class StreamhubProvider : MainAPI() {
         return if (this.type == "movie") {
             // Dla filmów
             provider.newMovieLoadResponse(
-                this.title,
+                this.name,
                 this.id,
                 TvType.Movie,
                 this.id
@@ -171,7 +171,7 @@ class StreamhubProvider : MainAPI() {
         } else {
             // Dla seriali
             provider.newTvSeriesLoadResponse(
-                this.title,
+                this.name,
                 this.id,
                 TvType.TvSeries,
                 this.seasons?.flatMap { season ->
