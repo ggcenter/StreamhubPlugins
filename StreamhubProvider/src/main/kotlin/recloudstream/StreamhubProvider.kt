@@ -1,5 +1,6 @@
 package recloudstream
 
+import com.lagradost.api.Log
 import com.lagradost.cloudstream3.HomePageList
 import com.lagradost.cloudstream3.HomePageResponse
 import com.lagradost.cloudstream3.LoadResponse
@@ -13,8 +14,6 @@ import com.lagradost.cloudstream3.newHomePageResponse
 import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.newMovieSearchResponse
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
-import com.lagradost.cloudstream3.mvvm.debugWarning
-import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
@@ -91,29 +90,30 @@ class StreamhubProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         try {
-            debugPrint("StreamhubProvider") { "Rozpoczęcie wyszukiwania: $query" }
+            Log.d("StreamhubProvider", "Rozpoczęcie wyszukiwania: $query")
 
             if (searchCache == null) {
-                debugPrint("StreamhubProvider") { "Cache jest pusty, ładowanie z API" }
+                Log.d("StreamhubProvider", "Cache jest pusty, ładowanie z API")
+
                 val response = makeApiRequest("search_catalog.json")
-                debugPrint("StreamhubProvider") { "Długość odpowiedzi API: ${response.length}" }
+                Log.d("StreamhubProvider", "Otrzymana odpowiedź API, długość: ${response.length}")
 
                 val parsedResponse = tryParseJson<VideoSearchResponse>(response)
                 if (parsedResponse == null) {
-                    debugPrint("StreamhubProvider") { "Parsowanie JSON zwróciło null" }
+                    Log.d("StreamhubProvider", "Parsowanie JSON zwróciło null")
                     return emptyList()
                 }
 
                 searchCache = parsedResponse.list
-                debugPrint("StreamhubProvider") { "Zapisano ${searchCache?.size ?: 0} elementów w cache" }
+                Log.d("StreamhubProvider", "Zapisano ${searchCache?.size ?: 0} elementów w cache")
             }
 
             val filtered = searchCache!!.filter { it.name.contains(query, ignoreCase = true) }
-            debugPrint("StreamhubProvider") { "Po filtrowaniu zostało ${filtered.size} wyników" }
+            Log.d("StreamhubProvider", "Po filtrowaniu zostało ${filtered.size} wyników")
 
             return filtered.map { it.toSearchResponse(this) }
         } catch (e: Exception) {
-            logError(e)
+            Log.e("StreamhubProvider", "Błąd w funkcji search: ${e.message}", e)
             return emptyList()
         }
     }
