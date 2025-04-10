@@ -84,20 +84,32 @@ class StreamhubProvider : MainAPI() {
 
     override val hasMainPage = true
 
-        private var searchCache: List<VideoItem>? = null
+    private var searchCache: List<VideoItem>? = null
 
-        override suspend fun search(query: String): List<SearchResponse> {
-            // Ładowanie danych do pamięci podręcznej, jeśli jeszcze nie załadowane
+    override suspend fun search(query: String): List<SearchResponse> {
+        try {
+            // Logowanie przed pobraniem danych
+            Log.d("StreamhubProvider", "Starting search for: $query")
+
             if (searchCache == null) {
+                Log.d("StreamhubProvider", "Cache is null, loading from API")
                 val response = makeApiRequest("search_catalog.json")
-                searchCache = tryParseJson<VideoSearchResponse>(response)?.list ?: emptyList()
+                Log.d("StreamhubProvider", "API Response: ${response.take(100)}...") // Pokaż początek odpowiedzi
+
+                searchCache = tryParseJson<VideoSearchResponse>(response)?.list
+                Log.d("StreamhubProvider", "Parsed items count: ${searchCache?.size ?: 0}")
             }
 
-            // Filtrowanie tytułów zawierających zapytanie
-            return searchCache!!
-                .filter { it.name.contains(query, ignoreCase = true) }
-                .map { it.toSearchResponse(this) }
+            // Filtrowanie tytułów
+            val filtered = searchCache?.filter { it.name.contains(query, ignoreCase = true) } ?: emptyList()
+            Log.d("StreamhubProvider", "Filtered results count: ${filtered.size}")
+
+            return filtered.map { it.toSearchResponse(this) }
+        } catch (e: Exception) {
+            Log.e("StreamhubProvider", "Error in search: ${e.message}", e)
+            return emptyList()
         }
+    }
 
     private suspend fun makeApiRequest(url: String): String {
         return app.get(
