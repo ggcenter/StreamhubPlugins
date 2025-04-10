@@ -113,7 +113,7 @@ class StreamhubProvider : MainAPI() {
 
             return filtered.map { it.toSearchResponse(this) }
         } catch (e: Exception) {
-            Log.e("StreamhubProvider", "Błąd w funkcji search: ${e.message}", e)
+            Log.e("StreamhubProvider", "Błąd w funkcji search: ${e.message}")
             return emptyList()
         }
     }
