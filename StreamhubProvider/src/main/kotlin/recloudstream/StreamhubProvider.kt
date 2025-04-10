@@ -95,7 +95,7 @@ class StreamhubProvider : MainAPI() {
 
             // Filtrowanie tytułów zawierających zapytanie
             return searchCache!!
-                .filter { it.title.contains(query, ignoreCase = true) }
+                .filter { it.name.contains(query, ignoreCase = true) }
                 .map { it.toSearchResponse(this) }
         }
 
