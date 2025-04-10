@@ -130,7 +130,7 @@ class StreamhubProvider : MainAPI() {
          } else {
              url
          }
-        val videoId = url
+
         val response = makeApiRequest("data/$videoId.json")
         val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return null
         return videoDetail.toLoadResponse(this)
