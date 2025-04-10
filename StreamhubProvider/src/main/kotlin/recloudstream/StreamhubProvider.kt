@@ -110,28 +110,55 @@ class StreamhubProvider : MainAPI() {
         }
     }
 
-    private suspend fun makeApiRequest(url: String): String {
+    override suspend fun search(query: String): List<SearchResponse> {
         try {
-            val fullUrl = "$mainUrl/$url"
-            println("StreamhubProvider: Wykonywanie żądania do: $fullUrl")
+            // Ładowanie danych do pamięci podręcznej, jeśli jeszcze nie załadowane
+            if (searchCache == null) {
+                val response = makeApiRequest("search_catalog.json")
 
-            val response = app.get(
-                fullUrl,
-                headers = mapOf("Authorization" to "Bearer $randomString")
-            )
+                // Sprawdź czy odpowiedź nie jest pusta
+                if (response.isBlank()) {
+                    println("StreamhubProvider: Pusta odpowiedź z API")
+                    return emptyList()
+                }
 
-            // Sprawdź status HTTP
-            if (!response.isSuccessful) {
-                println("StreamhubProvider: Błąd HTTP: ${response.code}")
-                return ""
+                // Logowanie długości odpowiedzi
+                println("StreamhubProvider: Długość odpowiedzi API: ${response.length}")
+
+                // Sprawdź czy odpowiedź jest prawidłowym JSON
+                val parsedResponse = tryParseJson<VideoSearchResponse>(response)
+                if (parsedResponse == null) {
+                    println("StreamhubProvider: Nie udało się sparsować JSON")
+                    return emptyList()
+                }
+
+                // Sprawdź, czy lista nie jest pusta
+                if (parsedResponse.list.isNullOrEmpty()) {
+                    println("StreamhubProvider: Lista elementów jest pusta")
+                    return emptyList()
+                }
+
+                searchCache = parsedResponse.list
+                println("StreamhubProvider: Pomyślnie załadowano ${searchCache!!.size} elementów")
             }
 
-            return response.text
+            // Upewnij się, że searchCache nie jest null przed filtrowaniem
+            if (searchCache == null) {
+                return emptyList()
+            }
+
+            // Filtrowanie tytułów zawierających zapytanie
+            val filteredList = searchCache!!.filter { it.name.contains(query, ignoreCase = true) }
+            println("StreamhubProvider: Znaleziono ${filteredList.size} pasujących elementów")
+
+            return filteredList.map { it.toSearchResponse(this) }
         } catch (e: Exception) {
-            println("StreamhubProvider: Błąd podczas wykonywania żądania API: ${e.message}")
-            return ""
+            println("StreamhubProvider: Błąd w funkcji search: ${e.message}")
+            e.printStackTrace()
+            return emptyList()
         }
     }
+
 
     private fun getRandomString(): String {
         val parts = arrayOf("github", "pat", "11AB5WZ2Q0QQjAmhZKAFkL", "rmvlSr3mmBj1QJmcJ6gGMNaS5zuK8k2J2GemoSJwsZG4WNXLANAWfPZaDw8")
