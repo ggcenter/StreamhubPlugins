@@ -43,7 +43,7 @@ class StreamhubProvider : MainAPI() {
         val episode: Int,
         val poster_path: String? = null,
         val description: String? = null,
-        val streams: List<Stream>? = null
+        val sources: List<Stream>? = null
     )
 
     data class Stream(
@@ -69,7 +69,7 @@ class StreamhubProvider : MainAPI() {
         val type: String,
         val description: String? = null,
         val poster_path: String? = null,
-        val streams: List<Stream>? = null,
+        val sources: List<Stream>? = null,
         val seasons: List<Season>? = null
     )
 
@@ -235,7 +235,7 @@ class StreamhubProvider : MainAPI() {
 
 
             // Ładuj linki dla odcinka
-            episode.streams?.forEach { stream ->
+            episode.sources?.forEach { stream ->
                 val host = hostMap[stream.i] ?: return@forEach
                 val url = host.t.replace("{hashid}", stream.h)
                 loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
@@ -246,7 +246,7 @@ class StreamhubProvider : MainAPI() {
             val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
 
             // Ładuj linki dla filmu
-            videoDetail.streams?.forEach { stream ->
+            videoDetail.sources?.forEach { stream ->
                 val host = hostMap[stream.i] ?: return@forEach
                 val url = host.t.replace("{hashid}", stream.h)
                 loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
