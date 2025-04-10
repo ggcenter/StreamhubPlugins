@@ -84,6 +84,21 @@ class StreamhubProvider : MainAPI() {
 
     override val hasMainPage = true
 
+        private var searchCache: List<VideoItem>? = null
+
+        override suspend fun search(query: String): List<SearchResponse> {
+            // Ładowanie danych do pamięci podręcznej, jeśli jeszcze nie załadowane
+            if (searchCache == null) {
+                val response = makeApiRequest("search_catalog.json")
+                searchCache = tryParseJson<VideoSearchResponse>(response)?.list ?: emptyList()
+            }
+
+            // Filtrowanie tytułów zawierających zapytanie
+            return searchCache!!
+                .filter { it.title.contains(query, ignoreCase = true) }
+                .map { it.toSearchResponse(this) }
+        }
+
     private suspend fun makeApiRequest(url: String): String {
         return app.get(
             "$mainUrl/$url",
@@ -117,11 +132,6 @@ class StreamhubProvider : MainAPI() {
         )
     }
 
-    override suspend fun search(query: String): List<SearchResponse> {
-        val response = makeApiRequest("main_page.json")
-        val searchResults = tryParseJson<VideoSearchResponse>(response)?.list ?: return emptyList()
-        return searchResults.map { it.toSearchResponse(this) }
-    }
 
     override suspend fun load(url: String): LoadResponse? {
      // Wyciągnij samo ID z pełnego URL
