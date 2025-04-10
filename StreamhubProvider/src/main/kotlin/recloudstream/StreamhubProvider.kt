@@ -73,13 +73,12 @@ class StreamhubProvider : MainAPI() {
         val seasons: List<Season>? = null
     )
 
-    override var mainUrl = "https://api.Streamhub.com"
+    override var mainUrl = "https://raw.githubusercontent.com/ggcenter/streamhub/refs/heads/main/public/github"
     override var name = "Streamhub"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     private val imageBaseUrl = "https://image.tmdb.org/t/p/w500"
     private val randomString = this.getRandomString()
-    private val githubRawBaseUrl = "https://raw.githubusercontent.com/ggcenter/streamhub/refs/heads/main/public/github"
 
     override var lang = "pl"
 
@@ -87,7 +86,7 @@ class StreamhubProvider : MainAPI() {
 
     private suspend fun makeApiRequest(url: String): String {
         return app.get(
-            "$githubRawBaseUrl/$url",
+            "$mainUrl/$url",
             headers = mapOf("Authorization" to "Bearer $randomString")
         ).text
     }
@@ -125,7 +124,12 @@ class StreamhubProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        // Zakładamy, że url to już samo ID
+     // Wyciągnij samo ID z pełnego URL
+         val videoId = if (url.contains("/")) {
+             url.substringAfterLast("/")
+         } else {
+             url
+         }
         val videoId = url
         val response = makeApiRequest("data/$videoId.json")
         val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return null
