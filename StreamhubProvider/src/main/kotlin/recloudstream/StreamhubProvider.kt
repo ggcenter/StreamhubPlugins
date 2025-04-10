@@ -88,27 +88,32 @@ class StreamhubProvider : MainAPI() {
 
     private var searchCache: List<VideoItem>? = null
 
+
     override suspend fun search(query: String): List<SearchResponse> {
         try {
-            // Logowanie przed pobraniem danych
-            debugWarning("Starting search for: $query")
+            debugPrint("StreamhubProvider") { "Rozpoczęcie wyszukiwania: $query" }
 
             if (searchCache == null) {
-                debugWarning("Cache is null, loading from API")
+                debugPrint("StreamhubProvider") { "Cache jest pusty, ładowanie z API" }
                 val response = makeApiRequest("search_catalog.json")
-                debugWarning("API Response: ${response.take(100)}...") // Pokaż początek odpowiedzi
+                debugPrint("StreamhubProvider") { "Długość odpowiedzi API: ${response.length}" }
 
-                searchCache = tryParseJson<VideoSearchResponse>(response)?.list
-                debugWarning("Parsed items count: ${searchCache?.size ?: 0}")
+                val parsedResponse = tryParseJson<VideoSearchResponse>(response)
+                if (parsedResponse == null) {
+                    debugPrint("StreamhubProvider") { "Parsowanie JSON zwróciło null" }
+                    return emptyList()
+                }
+
+                searchCache = parsedResponse.list
+                debugPrint("StreamhubProvider") { "Zapisano ${searchCache?.size ?: 0} elementów w cache" }
             }
 
-            // Filtrowanie tytułów
-            val filtered = searchCache?.filter { it.name.contains(query, ignoreCase = true) } ?: emptyList()
-            debugWarning("Filtered results count: ${filtered.size}")
+            val filtered = searchCache!!.filter { it.name.contains(query, ignoreCase = true) }
+            debugPrint("StreamhubProvider") { "Po filtrowaniu zostało ${filtered.size} wyników" }
 
             return filtered.map { it.toSearchResponse(this) }
         } catch (e: Exception) {
-            logError("Error in search: ${e.message}")
+            logError(e)
             return emptyList()
         }
     }
