@@ -56,7 +56,7 @@ class StreamhubProvider : MainAPI() {
         val name: String,
         val type: String,
         @Suppress("PropertyName")
-        val poster_path: String
+        val poster_path: String?
     )
 
     data class VideoSearchResponse(
@@ -77,7 +77,8 @@ class StreamhubProvider : MainAPI() {
     override var name = "Streamhub"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    private val imageBaseUrl = "https://image.tmdb.org/t/p/w500"
+    private val imageBaseUrl = "https://image.tmdb.org/t/p/original"
+    private val imageDefaultUrl = "https://motivatevalmorgan.com/wp-content/uploads/2016/06/default-movie-1-3-476x700.jpg"
     private val randomString = this.getRandomString()
 
     override var lang = "pl"
@@ -208,7 +209,9 @@ class StreamhubProvider : MainAPI() {
                 this.id,
                 tvType
             ) {
-                this.posterUrl = provider.imageBaseUrl + this@toSearchResponse.poster_path // [1]
+                this.posterUrl = this@toSearchResponse.poster_path?.let {
+                    provider.imageBaseUrl + it
+                } ?: provider.imageDefaultUrl
             }
         } else {
             provider.newTvSeriesSearchResponse(
@@ -216,7 +219,9 @@ class StreamhubProvider : MainAPI() {
                 this.id,
                 tvType
             ) {
-                this.posterUrl = provider.imageBaseUrl + this@toSearchResponse.poster_path // [2]
+                 this.posterUrl = this@toSearchResponse.poster_path?.let {
+                     provider.imageBaseUrl + it
+                 } ?: provider.imageDefaultUrl
             }
         }
     }
@@ -234,7 +239,7 @@ class StreamhubProvider : MainAPI() {
                 this.plot = this@toLoadResponse.description  // Teraz działa
                 this.posterUrl = this@toLoadResponse.poster_path?.let {
                     provider.imageBaseUrl + it
-                }
+                } ?: provider.imageDefaultUrl
             }
         } else {
             // Dla seriali
@@ -256,7 +261,7 @@ class StreamhubProvider : MainAPI() {
                 this.plot = this@toLoadResponse.description  // Teraz działa
                 this.posterUrl = this@toLoadResponse.poster_path?.let {
                     provider.imageBaseUrl + it
-                }
+                } ?: provider.imageDefaultUrl
             }
         }
     }
