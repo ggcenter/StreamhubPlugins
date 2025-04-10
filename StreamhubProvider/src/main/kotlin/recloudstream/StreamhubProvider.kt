@@ -13,6 +13,8 @@ import com.lagradost.cloudstream3.newHomePageResponse
 import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.newMovieSearchResponse
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
+import com.lagradost.cloudstream3.mvvm.debugWarning
+import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
@@ -89,20 +91,20 @@ class StreamhubProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         try {
             // Logowanie przed pobraniem danych
-            logDebug("Starting search for: $query")
+            debugWarning("Starting search for: $query")
 
             if (searchCache == null) {
-                logDebug("Cache is null, loading from API")
+                debugWarning("Cache is null, loading from API")
                 val response = makeApiRequest("search_catalog.json")
-                logDebug("API Response: ${response.take(100)}...") // Pokaż początek odpowiedzi
+                debugWarning("API Response: ${response.take(100)}...") // Pokaż początek odpowiedzi
 
                 searchCache = tryParseJson<VideoSearchResponse>(response)?.list
-                logDebug("Parsed items count: ${searchCache?.size ?: 0}")
+                debugWarning("Parsed items count: ${searchCache?.size ?: 0}")
             }
 
             // Filtrowanie tytułów
             val filtered = searchCache?.filter { it.name.contains(query, ignoreCase = true) } ?: emptyList()
-            logDebug("Filtered results count: ${filtered.size}")
+            debugWarning("Filtered results count: ${filtered.size}")
 
             return filtered.map { it.toSearchResponse(this) }
         } catch (e: Exception) {
