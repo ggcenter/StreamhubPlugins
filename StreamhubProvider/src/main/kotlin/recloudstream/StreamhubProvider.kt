@@ -53,7 +53,7 @@ class StreamhubProvider : MainAPI() {
 
     data class VideoItem(
         val id: String,
-        val title: String,
+        val name: String,
         val type: String,
         @Suppress("PropertyName")
         val poster_path: String
@@ -65,7 +65,7 @@ class StreamhubProvider : MainAPI() {
 
     data class VideoDetailResponse(
         val id: String,
-        val title: String,
+        val name: String,
         val type: String,
         val description: String? = null,
         val poster_path: String? = null,
@@ -119,7 +119,7 @@ class StreamhubProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val response = makeApiRequest("search.json")
+        val response = makeApiRequest("main_page.json")
         val searchResults = tryParseJson<VideoSearchResponse>(response)?.list ?: return emptyList()
         return searchResults.map { it.toSearchResponse(this) }
     }
