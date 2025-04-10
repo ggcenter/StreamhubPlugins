@@ -237,7 +237,7 @@ class StreamhubProvider : MainAPI() {
             // Ładuj linki dla odcinka
             episode.streams?.forEach { stream ->
                 val host = hostMap[stream.i] ?: return@forEach
-                val url = host.t.replace("{hashid}", stream.h).encodeUri()
+                val url = host.t.replace("{hashid}", stream.h)
                 loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
             }
         } else {
@@ -248,7 +248,7 @@ class StreamhubProvider : MainAPI() {
             // Ładuj linki dla filmu
             videoDetail.streams?.forEach { stream ->
                 val host = hostMap[stream.i] ?: return@forEach
-                val url = host.t.replace("{hashid}", stream.h).encodeUri()
+                val url = host.t.replace("{hashid}", stream.h)
                 loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
             }
         }
