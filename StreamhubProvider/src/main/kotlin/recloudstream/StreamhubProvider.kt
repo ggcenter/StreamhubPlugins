@@ -89,24 +89,24 @@ class StreamhubProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         try {
             // Logowanie przed pobraniem danych
-            Log.d("StreamhubProvider", "Starting search for: $query")
+            logDebug("Starting search for: $query")
 
             if (searchCache == null) {
-                Log.d("StreamhubProvider", "Cache is null, loading from API")
+                logDebug("Cache is null, loading from API")
                 val response = makeApiRequest("search_catalog.json")
-                Log.d("StreamhubProvider", "API Response: ${response.take(100)}...") // Pokaż początek odpowiedzi
+                logDebug("API Response: ${response.take(100)}...") // Pokaż początek odpowiedzi
 
                 searchCache = tryParseJson<VideoSearchResponse>(response)?.list
-                Log.d("StreamhubProvider", "Parsed items count: ${searchCache?.size ?: 0}")
+                logDebug("Parsed items count: ${searchCache?.size ?: 0}")
             }
 
             // Filtrowanie tytułów
             val filtered = searchCache?.filter { it.name.contains(query, ignoreCase = true) } ?: emptyList()
-            Log.d("StreamhubProvider", "Filtered results count: ${filtered.size}")
+            logDebug("Filtered results count: ${filtered.size}")
 
             return filtered.map { it.toSearchResponse(this) }
         } catch (e: Exception) {
-            Log.e("StreamhubProvider", "Error in search: ${e.message}", e)
+            logError("Error in search: ${e.message}")
             return emptyList()
         }
     }
