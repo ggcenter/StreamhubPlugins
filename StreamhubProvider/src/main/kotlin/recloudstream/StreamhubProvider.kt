@@ -38,6 +38,7 @@ class StreamhubProvider : MainAPI() {
 
     data class Episode(
         val number: Int,
+        val name: String? = null,
         val sources: List<Stream>? = null
     )
 
