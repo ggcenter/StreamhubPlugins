@@ -32,17 +32,12 @@ class StreamhubProvider : MainAPI() {
     )
 
     data class Season(
-        val season: Int,
-        val name: String? = null,
+        val number: Int,
         val episodes: List<Episode>
     )
 
     data class Episode(
-        val id: String,
-        val name: String,
-        val episode: Int,
-        val poster_path: String? = null,
-        val description: String? = null,
+        val number: Int,
         val sources: List<Stream>? = null
     )
 
@@ -55,6 +50,7 @@ class StreamhubProvider : MainAPI() {
         val id: String,
         val name: String,
         val type: String,
+        val year: Int? = null,
         @Suppress("PropertyName")
         val poster_path: String?
     )
@@ -67,8 +63,10 @@ class StreamhubProvider : MainAPI() {
         val id: String,
         val name: String,
         val type: String,
-        val description: String? = null,
+        val year: Int? = null,
+        val overview: String? = null,
         val poster_path: String? = null,
+        val backdrop_path: String? = null,
         val sources: List<Stream>? = null,
         val seasons: List<Season>? = null
     )
@@ -175,12 +173,12 @@ class StreamhubProvider : MainAPI() {
                 HomePageList(
                     "Popularne filmy",
                     popular.filter { it.type == "movie" }.map { it.toSearchResponse(this) },
-                    true
+                    false
                 ),
                 HomePageList(
                     "Popularne seriale",
                     popular.filter { it.type == "tv" }.map { it.toSearchResponse(this) },
-                    true
+                    false
                 ),
             ),
             false
@@ -212,6 +210,9 @@ class StreamhubProvider : MainAPI() {
                 this.posterUrl = this@toSearchResponse.poster_path?.let {
                     provider.imageBaseUrl + it
                 } ?: provider.imageDefaultUrl
+                this.year = this@toSearchResponse.year?.let {
+                    it
+                }
             }
         } else {
             provider.newTvSeriesSearchResponse(
@@ -222,6 +223,9 @@ class StreamhubProvider : MainAPI() {
                  this.posterUrl = this@toSearchResponse.poster_path?.let {
                      provider.imageBaseUrl + it
                  } ?: provider.imageDefaultUrl
+                 this.year = this@toSearchResponse.year?.let {
+                     it
+                 }
             }
         }
     }
@@ -236,10 +240,18 @@ class StreamhubProvider : MainAPI() {
                 TvType.Movie,
                 this.id
             ) {
-                this.plot = this@toLoadResponse.description  // Teraz działa
                 this.posterUrl = this@toLoadResponse.poster_path?.let {
                     provider.imageBaseUrl + it
                 } ?: provider.imageDefaultUrl
+                this.backgroundPosterUrl = this@toLoadResponse.backdrop_path?.let {
+                    provider.imageBaseUrl + it
+                } ?: provider.imageDefaultUrl
+                 this.year = this@toLoadResponse.year?.let {
+                     it
+                 }
+                this.plot = this@toLoadResponse.overview?.let {
+                     it
+                }
             }
         } else {
             // Dla seriali
@@ -250,18 +262,26 @@ class StreamhubProvider : MainAPI() {
                 this.seasons?.flatMap { season ->
                     season.episodes?.map { episode ->
                         CSEpisode(
-                            "${this.id}_${episode.id}",
+                            "${this.id}_${season.number}_${episode.number}",
                             episode.name,
-                            season.season,
-                            episode.episode
+                            season.number,
+                            episode.number
                         )
                     } ?: emptyList()
                 } ?: emptyList()
             ) {
-                this.plot = this@toLoadResponse.description  // Teraz działa
                 this.posterUrl = this@toLoadResponse.poster_path?.let {
                     provider.imageBaseUrl + it
                 } ?: provider.imageDefaultUrl
+                this.backgroundPosterUrl = this@toLoadResponse.backdrop_path?.let {
+                    provider.imageBaseUrl + it
+                } ?: provider.imageDefaultUrl
+                 this.year = this@toLoadResponse.year?.let {
+                     it
+                 }
+                this.plot = this@toLoadResponse.overview?.let {
+                     it
+                }
             }
         }
     }
@@ -283,23 +303,17 @@ class StreamhubProvider : MainAPI() {
             // Format ID: "serialId_sXeY" gdzie X to numer sezonu, Y to numer odcinka
             val parts = data.split("_")
             val seriesId = parts[0]
-            val episodeId = parts[1] // format "sXeY"
-
-            // Wyciągnij numer sezonu i odcinka z episodeId
-            val (seasonPart, episodePart) = episodeId.split("e").takeIf {
-                it.size == 2
-            } ?: return false
-            val seasonNumber = seasonPart.substring(1).toIntOrNull() ?: 1
-            val episodeNumber = episodePart.toIntOrNull() ?: 1
+            val seasonNumber = parts[1].toIntOrNull() ?: 1
+            val episodeNumber = parts[3].toIntOrNull() ?: 1
 
             val response = makeApiRequest("data/$seriesId.json")
             val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
 
             // Znajdź odpowiedni odcinek
             val episode = seriesDetail.seasons
-                ?.find { it.season == seasonNumber }
+                ?.find { it.number == seasonNumber }
                 ?.episodes
-                ?.find { it.episode == episodeNumber }
+                ?.find { it.number == episodeNumber }
                 ?: return false
 
 
