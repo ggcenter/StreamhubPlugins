@@ -305,7 +305,7 @@ class StreamhubProvider : MainAPI() {
             val parts = data.split("_")
             val seriesId = parts[0]
             val seasonNumber = parts[1].toIntOrNull() ?: 1
-            val episodeNumber = parts[3].toIntOrNull() ?: 1
+            val episodeNumber = parts[2].toIntOrNull() ?: 1
 
             val response = makeApiRequest("data/$seriesId.json")
             val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
