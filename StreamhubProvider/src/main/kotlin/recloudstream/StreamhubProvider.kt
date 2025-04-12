@@ -178,11 +178,7 @@ class StreamhubProvider : MainAPI() {
         val toplists = tryParseJson<ToplistsResponse>(response)?.toplists ?: emptyList()
 
         return newHomePageResponse(
-            listOf(
-                toplists.map{
-                    HomePageList(it.name, it.titles.map { it.toSearchResponse(this) }, false)
-                }
-            ),
+            toplists.map{HomePageList(it.name, it.titles?.map { it.toSearchResponse(this) } ?: emptyList(), false)},
             false
         )
     }
