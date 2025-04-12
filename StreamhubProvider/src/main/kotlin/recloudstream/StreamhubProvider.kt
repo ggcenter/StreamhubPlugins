@@ -27,6 +27,14 @@ class StreamhubProvider : MainAPI() {
         val t: String
     )
 
+    data class Toplist(
+        val name: String,
+        val titles: List<VideoItem>? = null,
+    )
+    data class ToplistsResponse(
+        val toplists: List<Toplist>
+    )
+
     data class HostsResponse(
         val hosts: List<Host>
     )
@@ -167,20 +175,13 @@ class StreamhubProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val response = makeApiRequest("main_page.json")
-        val popular = tryParseJson<VideoSearchResponse>(response)?.list ?: emptyList()
+        val toplists = tryParseJson<ToplistsResponse>(response)?.toplists ?: emptyList()
 
         return newHomePageResponse(
             listOf(
-                HomePageList(
-                    "Popularne filmy",
-                    popular.filter { it.type == "movie" }.map { it.toSearchResponse(this) },
-                    false
-                ),
-                HomePageList(
-                    "Popularne seriale",
-                    popular.filter { it.type == "tv" }.map { it.toSearchResponse(this) },
-                    false
-                ),
+                toplists.map{
+                    HomePageList(it.name, it.titles.map { it.toSearchResponse(this) }, false)
+                }
             ),
             false
         )
@@ -301,7 +302,7 @@ class StreamhubProvider : MainAPI() {
             val hostMap = hosts.associateBy { it.i }
 
         if (isEpisode) {
-            // Format ID: "serialId_sXeY" gdzie X to numer sezonu, Y to numer odcinka
+            // Format ID: "serialId_X_Y" gdzie X to numer sezonu, Y to numer odcinka
             val parts = data.split("_")
             val seriesId = parts[0]
             val seasonNumber = parts[1].toIntOrNull() ?: 1
