@@ -200,7 +200,7 @@ class StreamhubProvider : MainAPI() {
 
 
     // Pomocnicza funkcja do konwersji kanału na SearchResponse
-    private fun Channel.toChannelSearchResponse(): SearchResponse? {
+    private fun Channel.toChannelSearchResponse(provider: StreamhubProvider): SearchResponse? {
         val name = this["name"]?.toString() ?: return null
         val url = this["url"]?.toString() ?: return null
         val logo = this["logo_path"]?.toString()
