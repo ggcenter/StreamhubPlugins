@@ -184,11 +184,17 @@ class StreamhubProvider : MainAPI() {
         val toplists = main_page?.toplists ?: emptyList()
         val channels = main_page?.channels ?: emptyList()
 
-            val toplistsSections = toplists.map { HomePageList(it.name, it.titles?.map { it.toSearchResponse(this) } ?: emptyList(), false) }
+        val toplistsSections = toplists.map {
+            HomePageList(
+                it.name,
+                it.titles?.map { item -> item.toSearchResponse(this) } ?: emptyList(),
+                false
+            )
+        }
 
             val channelsSection = HomePageList(
                 "IPTV",
-                channels?.map { it.toChannelSearchResponse(this) } ?: emptyList(),
+                it.channels?.map { item -> item.toChannelSearchResponse(this) } ?: emptyList(),
                 true
             )
 
