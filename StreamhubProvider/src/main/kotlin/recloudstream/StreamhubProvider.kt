@@ -201,10 +201,7 @@ class StreamhubProvider : MainAPI() {
 
     // Pomocnicza funkcja do konwersji kanału na SearchResponse
     private fun Channel.toChannelSearchResponse(provider: StreamhubProvider): SearchResponse? {
-        val name = this["name"]?.toString() ?: return null
-        val url = this["url"]?.toString() ?: return null
-        val logo = this["logo_path"]?.toString()
-        return newMovieSearchResponse(name, url, TvType.Live) {
+        return newMovieSearchResponse(this.name, this.url, TvType.Live) {
             this.posterUrl = provider.piconBaseUrl + this@toChannelSearchResponse.logo
         }
     }
