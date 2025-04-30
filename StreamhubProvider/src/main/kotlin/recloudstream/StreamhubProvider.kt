@@ -26,15 +26,19 @@ class StreamhubProvider : MainAPI() {
         val i: Int,
         val t: String
     )
-
+    data class Channel(
+        val name: String,
+        val url: String,
+        val logo_path: String? = null,
+    )
     data class Toplist(
         val name: String,
         val titles: List<VideoItem>? = null,
     )
-    data class ToplistsResponse(
-        val toplists: List<Toplist>
+    data class MainPageResponse(
+        val toplists: List<Toplist>,
+        val channels: List<Channel>
     )
-
     data class HostsResponse(
         val hosts: List<Host>
     )
@@ -84,6 +88,7 @@ class StreamhubProvider : MainAPI() {
     override var name = "Streamhub"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
+    private val piconBaseUrl = "https://github.com/picons/picons/blob/master/build-source/logos"
     private val imageBaseUrl = "https://image.tmdb.org/t/p/original"
     private val imageDefaultUrl = "https://motivatevalmorgan.com/wp-content/uploads/2016/06/default-movie-1-3-476x700.jpg"
     private val randomString = this.getRandomString()
@@ -175,12 +180,33 @@ class StreamhubProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val response = makeApiRequest("main_page.json")
-        val toplists = tryParseJson<ToplistsResponse>(response)?.toplists ?: emptyList()
+        val main_page = tryParseJson<MainPageResponse>(response)
+        val toplists = main_page?.toplists ?: emptyList()
+        val channels = main_page?.channels ?: emptyList()
+
+            val toplistsSections = toplists.map { HomePageList(it.name, it.titles?.map { it.toSearchResponse(this) } ?: emptyList(), false) }
+
+            val channelsSection = HomePageList(
+                "IPTV",
+                channels?.map { it.toChannelSearchResponse(this) } ?: emptyList(),
+                true
+            )
 
         return newHomePageResponse(
-            toplists.map{HomePageList(it.name, it.titles?.map { it.toSearchResponse(this) } ?: emptyList(), false)},
+            toplistsSections + listOf(channelsSection),
             false
         )
+    }
+
+
+    // Pomocnicza funkcja do konwersji kanału na SearchResponse
+    private fun Channel.toChannelSearchResponse(): SearchResponse? {
+        val name = this["name"]?.toString() ?: return null
+        val url = this["url"]?.toString() ?: return null
+        val logo = this["logo_path"]?.toString()
+        return newMovieSearchResponse(name, url, TvType.Live) {
+            this.posterUrl = provider.piconBaseUrl + this@toChannelSearchResponse.logo
+        }
     }
 
 
