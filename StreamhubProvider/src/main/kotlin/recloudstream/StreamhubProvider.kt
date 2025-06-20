@@ -14,8 +14,10 @@ import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.newMovieSearchResponse
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.cloudstream3.newTvSeriesSearchResponse
 import com.lagradost.cloudstream3.Episode as CSEpisode
@@ -191,8 +193,6 @@ override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageR
 
     // Dodaj kanały IPTV jako osobną sekcję
     val iptvChannels = parseM3UPlaylist()
-    val iptvSearchResponses = iptvChannels.map { it.toSearchResponse(this) }
-
     val homePageLists = mutableListOf<HomePageList>()
 
     // Dodaj istniejące listy
@@ -203,18 +203,22 @@ override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageR
     )
 
     // Dodaj kanały IPTV pogrupowane według kategorii
-
+    if (iptvChannels.isNotEmpty()) {
+        val groupedChannels = iptvChannels.groupBy { it.group ?: "Pozostałe" }
+        groupedChannels.forEach { (groupName, channels) ->
             homePageLists.add(
                 HomePageList(
                     "IPTV - $groupName",
-                    iptvChannels.map { it.toSearchResponse(this) },
+                    channels.map { it.toSearchResponse(this) },
                     false
                 )
             )
-
+        }
+    }
 
     return newHomePageResponse(homePageLists, false)
 }
+
 
 
 
@@ -354,19 +358,19 @@ private fun IPTVChannel.toSearchResponse(provider: StreamhubProvider): SearchRes
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
-            callback.invoke(
-                ExtractorLink(
-                    source = this.name,
-                    name = "IPTV Stream",
-                    url = data,
-                    referer = "",
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = data.contains(".m3u8")
-                )
-            )
-            return true
-        }
+      if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
+          callback.invoke(
+              newExtractorLink(
+                  source = this.name,
+                  name = "IPTV Stream",
+                  url = data,
+                  referer = "",
+                  quality = 0, // Użyj 0 zamiast Qualities.Unknown.value
+                  isM3u8 = data.contains(".m3u8")
+              )
+          )
+          return true
+      }
 
         val isEpisode = data.contains("_")
 
