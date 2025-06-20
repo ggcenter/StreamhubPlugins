@@ -458,7 +458,8 @@ private suspend fun parseM3UPlaylist(): List<IPTVChannel> {
                 val channelMeta = channelsMetadata.find { it.id == tvgId }
 
                 // Generuj placeholder logo z randomowym kolorem i nazwą kanału
-                val placeholderLogo = generatePlaceholderLogo(tvgId.substringBefore("."))
+                val placeholderLogo = generatePlaceholderLogo(tvgId?.substringBefore(".") ?: "TV")
+
 
                 if (i + 1 < lines.size) {
                     val url = lines[i + 1].trim()
@@ -540,7 +541,7 @@ private suspend fun fetchChannelsMetadata(): List<ChannelMetadata> {
     }
 }
 
-private fun generatePlaceholderLogo(channelName: String): String {
+private fun generatePlaceholderLogo(channelName: String?): String {
     // Lista kolorów do losowego wyboru
     val colors = listOf(
         "ff5722", "e91e63", "9c27b0", "673ab7", "3f51b5",
@@ -548,21 +549,22 @@ private fun generatePlaceholderLogo(channelName: String): String {
         "8bc34a", "cddc39", "ffc107", "ff9800", "795548"
     )
 
-    // Wybierz losowy kolor na podstawie nazwy kanału (żeby był konsystentny)
-    val colorIndex = channelName.hashCode().absoluteValue % colors.size
+    // Użyj bezpiecznej nazwy
+    val safeName = channelName ?: "TV"
+
+    // Wybierz losowy kolor na podstawie nazwy kanału
+    val colorIndex = safeName.hashCode().absoluteValue % colors.size
     val backgroundColor = colors[colorIndex]
 
     // Oczyść nazwę kanału z niepotrzebnych znaków i skróć
-    val cleanName = channelName
-        .replace(Regex("[^a-zA-Z0-9\\s]"), "") // Usuń znaki specjalne
-        .replace("\\s+".toRegex(), "+") // Zamień spacje na +
-        .take(8) // Maksymalnie 8 znaków
+    val cleanName = safeName
+        .replace(Regex("[^a-zA-Z0-9\\s]"), "")
+        .replace("\\s+".toRegex(), "+")
+        .take(8)
         .uppercase()
 
-    // Jeśli nazwa jest pusta po czyszczeniu, użyj "TV"
     val finalName = if (cleanName.isBlank()) "TV" else cleanName
 
-    // Użyj placehold.co zamiast via.placeholder.com
     return "https://placehold.co/200x200/$backgroundColor/ffffff?text=$finalName"
 }
 }
