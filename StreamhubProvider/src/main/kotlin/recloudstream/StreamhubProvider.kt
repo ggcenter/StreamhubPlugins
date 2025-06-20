@@ -22,16 +22,28 @@ import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.cloudstream3.newTvSeriesSearchResponse
 import com.lagradost.cloudstream3.Episode as CSEpisode
+import kotlin.math.absoluteValue
 
 class StreamhubProvider : MainAPI() {
 
-    data class IPTVChannel(
-        val name: String,
-        val url: String,
-        val logo: String? = null,
-        val group: String? = null,
-        val language: String? = null
-    )
+data class IPTVChannel(
+    val name: String,
+    val url: String,
+    val logo: String? = null,
+    val group: String? = null,
+    val language: String? = null,
+    val tvgId: String? = null
+)
+
+data class ChannelMetadata(
+    val id: String,
+    val name: String,
+    val country: String,
+    val languages: List<String>,
+    val categories: List<String>,
+    val logo: String?,
+    val website: String?
+)
 
     data class IPTVResponse(
         val channels: List<IPTVChannel>
@@ -203,18 +215,15 @@ override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageR
         }
     )
 
-    // Dodaj kanały IPTV pogrupowane według kategorii
+    // Dodaj wszystkie kanały IPTV w jednej grupie
     if (iptvChannels.isNotEmpty()) {
-        val groupedChannels = iptvChannels.groupBy { it.group ?: "Pozostałe" }
-        groupedChannels.forEach { (groupName, channels) ->
-            homePageLists.add(
-                HomePageList(
-                    "IPTV - $groupName",
-                    channels.map { it.toSearchResponse(this) },
-                    false
-                )
+        homePageLists.add(
+            HomePageList(
+                "IPTV Polska",
+                iptvChannels.map { it.toSearchResponse(this) },
+                false
             )
-        }
+        )
     }
 
     return newHomePageResponse(homePageLists, false)
@@ -412,67 +421,117 @@ override suspend fun loadLinks(
 
 
 
-
-
-
-    private suspend fun parseM3UPlaylist(): List<IPTVChannel> {
-        try {
-            val response = app.get("https://raw.githubusercontent.com/iptv-org/iptv/refs/heads/master/streams/pl.m3u")
-            if (!response.isSuccessful) {
-                println("StreamhubProvider: Błąd pobierania playlisty M3U: ${response.code}")
-                return emptyList()
-            }
-
-            val content = response.text
-            val channels = mutableListOf<IPTVChannel>()
-            val lines = content.lines()
-
-            var i = 0
-            while (i < lines.size) {
-                val line = lines[i].trim()
-
-                if (line.startsWith("#EXTINF:")) {
-                    // Parsowanie metadanych kanału
-                    val metadata = line.substringAfter("#EXTINF:")
-                    val name = metadata.substringAfterLast(",").trim()
-
-                    // Wyciągnij logo jeśli istnieje
-                    val logo = if (metadata.contains("tvg-logo=")) {
-                        metadata.substringAfter("tvg-logo=\"").substringBefore("\"")
-                    } else null
-
-                    // Wyciągnij grupę jeśli istnieje
-                    val group = if (metadata.contains("group-title=")) {
-                        metadata.substringAfter("group-title=\"").substringBefore("\"")
-                    } else null
-
-                    // Następna linia powinna zawierać URL
-                    if (i + 1 < lines.size) {
-                        val url = lines[i + 1].trim()
-                        if (url.isNotEmpty() && !url.startsWith("#")) {
-                            channels.add(
-                                IPTVChannel(
-                                    name = name,
-                                    url = url,
-                                    logo = logo,
-                                    group = group,
-                                    language = "pl"
-                                )
-                            )
-                        }
-                    }
-                    i += 2
-                } else {
-                    i++
-                }
-            }
-
-            println("StreamhubProvider: Załadowano ${channels.size} kanałów IPTV")
-            return channels
-
-        } catch (e: Exception) {
-            println("StreamhubProvider: Błąd parsowania M3U: ${e.message}")
+private suspend fun parseM3UPlaylist(): List<IPTVChannel> {
+    try {
+        val response = app.get("https://raw.githubusercontent.com/iptv-org/iptv/refs/heads/master/streams/pl.m3u")
+        if (!response.isSuccessful) {
+            println("StreamhubProvider: Błąd pobierania playlisty M3U: ${response.code}")
             return emptyList()
         }
+
+        val content = response.text
+        val channels = mutableListOf<IPTVChannel>()
+        val lines = content.lines()
+
+        // Pobierz metadane kanałów z API
+        val channelsMetadata = fetchChannelsMetadata()
+
+        var i = 0
+        while (i < lines.size) {
+            val line = lines[i].trim()
+            if (line.startsWith("#EXTINF:")) {
+                val metadata = line.substringAfter("#EXTINF:")
+                val name = metadata.substringAfterLast(",").trim()
+
+                // Wyciągnij tvg-id i usuń suffix po @
+                val tvgId = if (metadata.contains("tvg-id=")) {
+                    val fullTvgId = metadata.substringAfter("tvg-id=\"").substringBefore("\"")
+                    // Usuń suffix po @ (np. "4FunTV.pl@SD" -> "4FunTV.pl")
+                    if (fullTvgId.contains("@")) {
+                        fullTvgId.substringBefore("@")
+                    } else {
+                        fullTvgId
+                    }
+                } else null
+
+                // Znajdź metadane na podstawie oczyszczonego tvg-id
+                val channelMeta = channelsMetadata.find { it.id == tvgId }
+
+                // Generuj placeholder logo z randomowym kolorem i nazwą kanału
+                val placeholderLogo = generatePlaceholderLogo(name)
+
+                if (i + 1 < lines.size) {
+                    val url = lines[i + 1].trim()
+                    if (url.isNotEmpty() && !url.startsWith("#")) {
+                        channels.add(
+                            IPTVChannel(
+                                name = channelMeta?.name ?: name,
+                                url = url,
+                                logo = channelMeta?.logo ?: placeholderLogo,
+                                group = "IPTV Polska", // Wszystkie kanały w jednej grupie
+                                language = "pl",
+                                tvgId = tvgId
+                            )
+                        )
+                    }
+                }
+                i += 2
+            } else {
+                i++
+            }
+        }
+
+        println("StreamhubProvider: Załadowano ${channels.size} kanałów IPTV")
+        return channels
+    } catch (e: Exception) {
+        println("StreamhubProvider: Błąd parsowania M3U: ${e.message}")
+        return emptyList()
+    }
+}
+
+
+    private suspend fun fetchChannelsMetadata(): List<ChannelMetadata> {
+        try {
+            // Pobierz dane o kanałach
+            val channelsResponse = app.get("https://iptv-org.github.io/api/channels.json")
+            if (!channelsResponse.isSuccessful) return emptyList()
+
+            val channelsData = tryParseJson<List<Map<String, Any>>>(channelsResponse.text) ?: return emptyList()
+
+            return channelsData.mapNotNull { channel ->
+                val id = channel["id"] as? String
+                val name = channel["name"] as? String
+                val country = channel["country"] as? String
+                val languages = (channel["languages"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                val categories = (channel["categories"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                val logo = channel["logo"] as? String
+                val website = channel["website"] as? String
+
+                if (id != null && name != null) {
+                    ChannelMetadata(id, name, country ?: "", languages, categories, logo, website)
+                } else null
+            }
+        } catch (e: Exception) {
+            println("StreamhubProvider: Błąd pobierania metadanych kanałów: ${e.message}")
+            return emptyList()
+        }
+    }
+
+    private fun generatePlaceholderLogo(channelName: String): String {
+        // Lista kolorów do losowego wyboru
+        val colors = listOf(
+            "FF5722", "E91E63", "9C27B0", "673AB7", "3F51B5",
+            "2196F3", "03A9F4", "00BCD4", "009688", "4CAF50",
+            "8BC34A", "CDDC39", "FFC107", "FF9800", "795548"
+        )
+
+        // Wybierz losowy kolor na podstawie nazwy kanału (żeby był konsystentny)
+        val colorIndex = channelName.hashCode().absoluteValue % colors.size
+        val backgroundColor = colors[colorIndex]
+
+        // Skróć nazwę kanału do maksymalnie 8 znaków dla lepszej czytelności
+        val shortName = channelName.take(8).uppercase()
+
+        return "https://via.placeholder.com/200x200/$backgroundColor/FFFFFF?text=$shortName"
     }
 }
