@@ -458,7 +458,7 @@ private suspend fun parseM3UPlaylist(): List<IPTVChannel> {
                 val channelMeta = channelsMetadata.find { it.id == tvgId }
 
                 // Generuj placeholder logo z randomowym kolorem i nazwą kanału
-                val placeholderLogo = generatePlaceholderLogo(name)
+                val placeholderLogo = generatePlaceholderLogo(tvgId.substringBefore("."))
 
                 if (i + 1 < lines.size) {
                     val url = lines[i + 1].trim()
@@ -468,7 +468,7 @@ private suspend fun parseM3UPlaylist(): List<IPTVChannel> {
                                 name = channelMeta?.name ?: name,
                                 url = url,
                                 logo = channelMeta?.logo ?: placeholderLogo,
-                                group = "IPTV Polska", // Wszystkie kanały w jednej grupie
+                                group = "IPTV", // Wszystkie kanały w jednej grupie
                                 language = "pl",
                                 tvgId = tvgId
                             )
@@ -490,15 +490,25 @@ private suspend fun parseM3UPlaylist(): List<IPTVChannel> {
 }
 
 
-    private suspend fun fetchChannelsMetadata(): List<ChannelMetadata> {
-        try {
-            // Pobierz dane o kanałach
-            val channelsResponse = app.get("https://iptv-org.github.io/api/channels.json")
-            if (!channelsResponse.isSuccessful) return emptyList()
+private suspend fun fetchChannelsMetadata(): List<ChannelMetadata> {
+    try {
+        println("StreamhubProvider: Pobieranie metadanych kanałów...")
+        val channelsResponse = app.get("https://iptv-org.github.io/api/channels.json")
+        if (!channelsResponse.isSuccessful) {
+            println("StreamhubProvider: Błąd HTTP przy pobieraniu channels.json: ${channelsResponse.code}")
+            return emptyList()
+        }
 
-            val channelsData = tryParseJson<List<Map<String, Any>>>(channelsResponse.text) ?: return emptyList()
+        val channelsData = tryParseJson<List<Map<String, Any>>>(channelsResponse.text)
+        if (channelsData == null) {
+            println("StreamhubProvider: Nie udało się sparsować channels.json")
+            return emptyList()
+        }
 
-            return channelsData.mapNotNull { channel ->
+        println("StreamhubProvider: Znaleziono ${channelsData.size} kanałów w API")
+
+        val metadata = channelsData.mapNotNull { channel ->
+            try {
                 val id = channel["id"] as? String
                 val name = channel["name"] as? String
                 val country = channel["country"] as? String
@@ -508,30 +518,51 @@ private suspend fun parseM3UPlaylist(): List<IPTVChannel> {
                 val website = channel["website"] as? String
 
                 if (id != null && name != null) {
+                    println("StreamhubProvider: Dodano metadane dla kanału: $id -> $name (logo: ${logo != null})")
                     ChannelMetadata(id, name, country ?: "", languages, categories, logo, website)
-                } else null
+                } else {
+                    println("StreamhubProvider: Pominięto kanał bez ID lub nazwy: $channel")
+                    null
+                }
+            } catch (e: Exception) {
+                println("StreamhubProvider: Błąd parsowania kanału: ${e.message}")
+                null
             }
-        } catch (e: Exception) {
-            println("StreamhubProvider: Błąd pobierania metadanych kanałów: ${e.message}")
-            return emptyList()
         }
+
+        println("StreamhubProvider: Pomyślnie załadowano ${metadata.size} metadanych kanałów")
+        return metadata
+
+    } catch (e: Exception) {
+        println("StreamhubProvider: Błąd pobierania metadanych kanałów: ${e.message}")
+        e.printStackTrace()
+        return emptyList()
     }
+}
 
-    private fun generatePlaceholderLogo(channelName: String): String {
-        // Lista kolorów do losowego wyboru
-        val colors = listOf(
-            "FF5722", "E91E63", "9C27B0", "673AB7", "3F51B5",
-            "2196F3", "03A9F4", "00BCD4", "009688", "4CAF50",
-            "8BC34A", "CDDC39", "FFC107", "FF9800", "795548"
-        )
+private fun generatePlaceholderLogo(channelName: String): String {
+    // Lista kolorów do losowego wyboru
+    val colors = listOf(
+        "ff5722", "e91e63", "9c27b0", "673ab7", "3f51b5",
+        "2196f3", "03a9f4", "00bcd4", "009688", "4caf50",
+        "8bc34a", "cddc39", "ffc107", "ff9800", "795548"
+    )
 
-        // Wybierz losowy kolor na podstawie nazwy kanału (żeby był konsystentny)
-        val colorIndex = channelName.hashCode().absoluteValue % colors.size
-        val backgroundColor = colors[colorIndex]
+    // Wybierz losowy kolor na podstawie nazwy kanału (żeby był konsystentny)
+    val colorIndex = channelName.hashCode().absoluteValue % colors.size
+    val backgroundColor = colors[colorIndex]
 
-        // Skróć nazwę kanału do maksymalnie 8 znaków dla lepszej czytelności
-        val shortName = channelName.take(8).uppercase()
+    // Oczyść nazwę kanału z niepotrzebnych znaków i skróć
+    val cleanName = channelName
+        .replace(Regex("[^a-zA-Z0-9\\s]"), "") // Usuń znaki specjalne
+        .replace("\\s+".toRegex(), "+") // Zamień spacje na +
+        .take(8) // Maksymalnie 8 znaków
+        .uppercase()
 
-        return "https://via.placeholder.com/200x200/$backgroundColor/FFFFFF?text=$shortName"
-    }
+    // Jeśli nazwa jest pusta po czyszczeniu, użyj "TV"
+    val finalName = if (cleanName.isBlank()) "TV" else cleanName
+
+    // Użyj placehold.co zamiast via.placeholder.com
+    return "https://placehold.co/200x200/$backgroundColor/ffffff?text=$finalName"
+}
 }
