@@ -22,6 +22,18 @@ import com.lagradost.cloudstream3.Episode as CSEpisode
 
 class StreamhubProvider : MainAPI() {
 
+    data class IPTVChannel(
+        val name: String,
+        val url: String,
+        val logo: String? = null,
+        val group: String? = null,
+        val language: String? = null
+    )
+
+    data class IPTVResponse(
+        val channels: List<IPTVChannel>
+    )
+
     data class Host(
         val i: Int,
         val t: String
@@ -82,7 +94,7 @@ class StreamhubProvider : MainAPI() {
 
     override var mainUrl = "https://raw.githubusercontent.com/ggcenter/streamhub/refs/heads/main/public/github"
     override var name = "Streamhub"
-    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Live)
 
     private val imageBaseUrl = "https://image.tmdb.org/t/p/original"
     private val imageDefaultUrl = "https://motivatevalmorgan.com/wp-content/uploads/2016/06/default-movie-1-3-476x700.jpg"
@@ -173,18 +185,59 @@ class StreamhubProvider : MainAPI() {
         return parts.joinToString("_")
     }
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val response = makeApiRequest("main_page.json")
-        val toplists = tryParseJson<ToplistsResponse>(response)?.toplists ?: emptyList()
+override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+    val response = makeApiRequest("main_page.json")
+    val toplists = tryParseJson<ToplistsResponse>(response)?.toplists ?: emptyList()
 
-        return newHomePageResponse(
-            toplists.map{HomePageList(it.name, it.titles?.map { it.toSearchResponse(this) } ?: emptyList(), false)},
-            false
-        )
-    }
+    // Dodaj kanały IPTV jako osobną sekcję
+    val iptvChannels = parseM3UPlaylist()
+    val iptvSearchResponses = iptvChannels.map { it.toSearchResponse(this) }
+
+    val homePageLists = mutableListOf<HomePageList>()
+
+    // Dodaj istniejące listy
+    homePageLists.addAll(
+        toplists.map {
+            HomePageList(it.name, it.titles?.map { it.toSearchResponse(this) } ?: emptyList(), false)
+        }
+    )
+
+    // Dodaj kanały IPTV pogrupowane według kategorii
+
+            homePageLists.add(
+                HomePageList(
+                    "IPTV - $groupName",
+                    iptvChannels.map { it.toSearchResponse(this) },
+                    false
+                )
+            )
+
+
+    return newHomePageResponse(homePageLists, false)
+}
+
 
 
     override suspend fun load(url: String): LoadResponse? {
+
+        if (url.startsWith("http") && (url.contains(".m3u8") || url.contains("stream") || url.contains("live"))) {
+            // To jest kanał IPTV
+            val channels = parseM3UPlaylist()
+            val channel = channels.find { it.url == url }
+
+            return channel?.let {
+                newMovieLoadResponse(
+                    it.name,
+                    it.url,
+                    TvType.Live,
+                    it.url
+                ) {
+                    this.posterUrl = it.logo ?: imageDefaultUrl
+                    this.plot = "Kanał telewizyjny na żywo${it.group?.let { group -> " z kategorii: $group" } ?: ""}"
+                }
+            }
+        }
+
      // Wyciągnij samo ID z pełnego URL
          val videoId = if (url.contains("/")) {
              url.substringAfterLast("/")
@@ -227,6 +280,16 @@ class StreamhubProvider : MainAPI() {
             }
         }
     }
+
+private fun IPTVChannel.toSearchResponse(provider: StreamhubProvider): SearchResponse {
+    return provider.newMovieSearchResponse(
+        this.name,
+        this.url,
+        TvType.Live
+    ) {
+        this.posterUrl = this@toSearchResponse.logo ?: provider.imageDefaultUrl
+    }
+}
 
 
     private suspend fun VideoDetailResponse.toLoadResponse(provider: StreamhubProvider): LoadResponse {
@@ -290,6 +353,21 @@ class StreamhubProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+
+        if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
+            callback.invoke(
+                ExtractorLink(
+                    source = this.name,
+                    name = "IPTV Stream",
+                    url = data,
+                    referer = "",
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = data.contains(".m3u8")
+                )
+            )
+            return true
+        }
+
         val isEpisode = data.contains("_")
 
             // Pobierz szablony hostingów
@@ -335,5 +413,66 @@ class StreamhubProvider : MainAPI() {
         }
 
         return true
+    }
+
+    private suspend fun parseM3UPlaylist(): List<IPTVChannel> {
+        try {
+            val response = app.get("https://raw.githubusercontent.com/iptv-org/iptv/refs/heads/master/streams/pl.m3u")
+            if (!response.isSuccessful) {
+                println("StreamhubProvider: Błąd pobierania playlisty M3U: ${response.code}")
+                return emptyList()
+            }
+
+            val content = response.text
+            val channels = mutableListOf<IPTVChannel>()
+            val lines = content.lines()
+
+            var i = 0
+            while (i < lines.size) {
+                val line = lines[i].trim()
+
+                if (line.startsWith("#EXTINF:")) {
+                    // Parsowanie metadanych kanału
+                    val metadata = line.substringAfter("#EXTINF:")
+                    val name = metadata.substringAfterLast(",").trim()
+
+                    // Wyciągnij logo jeśli istnieje
+                    val logo = if (metadata.contains("tvg-logo=")) {
+                        metadata.substringAfter("tvg-logo=\"").substringBefore("\"")
+                    } else null
+
+                    // Wyciągnij grupę jeśli istnieje
+                    val group = if (metadata.contains("group-title=")) {
+                        metadata.substringAfter("group-title=\"").substringBefore("\"")
+                    } else null
+
+                    // Następna linia powinna zawierać URL
+                    if (i + 1 < lines.size) {
+                        val url = lines[i + 1].trim()
+                        if (url.isNotEmpty() && !url.startsWith("#")) {
+                            channels.add(
+                                IPTVChannel(
+                                    name = name,
+                                    url = url,
+                                    logo = logo,
+                                    group = group,
+                                    language = "pl"
+                                )
+                            )
+                        }
+                    }
+                    i += 2
+                } else {
+                    i++
+                }
+            }
+
+            println("StreamhubProvider: Załadowano ${channels.size} kanałów IPTV")
+            return channels
+
+        } catch (e: Exception) {
+            println("StreamhubProvider: Błąd parsowania M3U: ${e.message}")
+            return emptyList()
+        }
     }
 }
