@@ -394,8 +394,8 @@ override suspend fun loadLinks(
 
         episode.sources?.forEach { stream ->
             val host = hostMap[stream.i] ?: return@forEach
-            val url = host.t.replace("{hashid}", stream.h)
-            loadExtractor(url, subtitleCallback, callback)
+            val streamUrl = host.t.replace("{hashid}", stream.h) // Zmieniona nazwa zmiennej
+            loadExtractor(streamUrl, subtitleCallback, callback)
         }
     } else {
         val response = makeApiRequest("data/$data.json")
@@ -403,13 +403,14 @@ override suspend fun loadLinks(
 
         videoDetail.sources?.forEach { stream ->
             val host = hostMap[stream.i] ?: return@forEach
-            val url = host.t.replace("{hashid}", stream.h)
-            loadExtractor(url, subtitleCallback, callback)
+            val streamUrl = host.t.replace("{hashid}", stream.h) // Zmieniona nazwa zmiennej
+            loadExtractor(streamUrl, subtitleCallback, callback)
         }
     }
 
     return true
 }
+
 
 
 
