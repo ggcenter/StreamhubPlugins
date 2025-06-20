@@ -361,14 +361,14 @@ private fun IPTVChannel.toSearchResponse(provider: StreamhubProvider): SearchRes
 
 if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
     callback.invoke(
-        ExtractorLink(
+        newExtractorLink(
             source = this.name,
             name = "IPTV Stream",
-            url = data,
-            referer = "",
-            quality = Qualities.Unknown.value,
-            isM3u8 = data.contains(".m3u8")
-        )
+            url = data
+        ) {
+            this.quality = Qualities.Unknown.value
+            this.isM3u8 = data.contains(".m3u8")
+        }
     )
     return true
 }
