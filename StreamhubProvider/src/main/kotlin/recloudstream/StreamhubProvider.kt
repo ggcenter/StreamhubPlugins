@@ -366,7 +366,6 @@ override suspend fun loadLinks(
                 url = data
             ) {
                 this.quality = Qualities.Unknown.value
-                this.isM3u8 = data.contains(".m3u8")
             }
         )
         return true
