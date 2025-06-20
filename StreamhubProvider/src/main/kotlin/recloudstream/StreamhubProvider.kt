@@ -352,64 +352,65 @@ private fun IPTVChannel.toSearchResponse(provider: StreamhubProvider): SearchRes
         }
     }
 
-  override suspend fun loadLinks(
-      data: String,
-      isCasting: Boolean,
-      subtitleCallback: (SubtitleFile) -> Unit,
-      callback: (ExtractorLink) -> Unit
-  ): Boolean {
-      if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
-          callback.invoke(
-              newExtractorLink(
-                  source = this.name,
-                  name = "IPTV Stream",
-                  url = data
-              ) {
-                  this.quality = Qualities.Unknown.value
-                  this.isM3u8 = data.contains(".m3u8")
-              }
-          )
-          return true
-      }
+override suspend fun loadLinks(
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
+        callback.invoke(
+            newExtractorLink(
+                source = this.name,
+                name = "IPTV Stream",
+                url = data
+            ) {
+                this.quality = Qualities.Unknown.value
+                this.isM3u8 = data.contains(".m3u8")
+            }
+        )
+        return true
+    }
 
-      val isEpisode = data.contains("_")
-      val hostsResponse = makeApiRequest("hosts.json")
-      val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: return false
-      val hostMap = hosts.associateBy { it.i }
+    val isEpisode = data.contains("_")
+    val hostsResponse = makeApiRequest("hosts.json")
+    val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: return false
+    val hostMap = hosts.associateBy { it.i }
 
-      if (isEpisode) {
-          val parts = data.split("_")
-          val seriesId = parts[0]
-          val seasonNumber = parts[1].toIntOrNull() ?: 1
-          val episodeNumber = parts[2].toIntOrNull() ?: 1
+    if (isEpisode) {
+        val parts = data.split("_")
+        val seriesId = parts[0]
+        val seasonNumber = parts[1].toIntOrNull() ?: 1
+        val episodeNumber = parts[2].toIntOrNull() ?: 1
 
-          val response = makeApiRequest("data/$seriesId.json")
-          val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
+        val response = makeApiRequest("data/$seriesId.json")
+        val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
 
-          val episode = seriesDetail.seasons
-              ?.find { it.number == seasonNumber }
-              ?.episodes
-              ?.find { it.number == episodeNumber }
-              ?: return false
+        val episode = seriesDetail.seasons
+            ?.find { it.number == seasonNumber }
+            ?.episodes
+            ?.find { it.number == episodeNumber }
+            ?: return false
 
-          episode.sources?.forEach { stream ->
-              val host = hostMap[stream.i] ?: return@forEach
-              val url = host.t.replace("{hashid}", stream.h)
-              loadExtractor(url, subtitleCallback, callback)
-          }
-      } else {
-          val response = makeApiRequest("data/$data.json")
-          val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
+        episode.sources?.forEach { stream ->
+            val host = hostMap[stream.i] ?: return@forEach
+            val url = host.t.replace("{hashid}", stream.h)
+            loadExtractor(url, subtitleCallback, callback)
+        }
+    } else {
+        val response = makeApiRequest("data/$data.json")
+        val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
 
-          videoDetail.sources?.forEach { stream ->
-              val host = hostMap[stream.i] ?: return@forEach
-              val url = host.t.replace("{hashid}", stream.h)
-              loadExtractor(url, subtitleCallback, callback)
-          }
-      }
+        videoDetail.sources?.forEach { stream ->
+            val host = hostMap[stream.i] ?: return@forEach
+            val url = host.t.replace("{hashid}", stream.h)
+            loadExtractor(url, subtitleCallback, callback)
+        }
+    }
 
-      return true
-  }
+    return true
+}
+
 
 
 
