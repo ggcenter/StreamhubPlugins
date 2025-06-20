@@ -358,19 +358,19 @@ private fun IPTVChannel.toSearchResponse(provider: StreamhubProvider): SearchRes
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-      if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
-          callback.invoke(
-              newExtractorLink(
-                  source = this.name,
-                  name = "IPTV Stream",
-                  url = data,
-                  referer = "",
-                  quality = 0, // Użyj 0 zamiast Qualities.Unknown.value
-                  isM3u8 = data.contains(".m3u8")
-              )
-          )
-          return true
-      }
+    if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
+        callback.invoke(
+            newExtractorLink(
+                this.name,
+                "IPTV Stream",
+                data,
+                "",
+                Qualities.Unknown.value,
+                data.contains(".m3u8")
+            )
+        )
+        return true
+    }
 
         val isEpisode = data.contains("_")
 
