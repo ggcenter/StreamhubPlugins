@@ -14,6 +14,7 @@ import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.newMovieSearchResponse
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
@@ -358,19 +359,19 @@ private fun IPTVChannel.toSearchResponse(provider: StreamhubProvider): SearchRes
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-    if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
-        callback.invoke(
-            newExtractorLink(
-                this.name,
-                "IPTV Stream",
-                data,
-                "",
-                Qualities.Unknown.value,
-                data.contains(".m3u8")
-            )
+if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
+    callback.invoke(
+        ExtractorLink(
+            source = this.name,
+            name = "IPTV Stream",
+            url = data,
+            referer = "",
+            quality = Qualities.Unknown.value,
+            isM3u8 = data.contains(".m3u8")
         )
-        return true
-    }
+    )
+    return true
+}
 
         val isEpisode = data.contains("_")
 
