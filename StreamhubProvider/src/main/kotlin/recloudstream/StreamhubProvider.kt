@@ -352,73 +352,65 @@ private fun IPTVChannel.toSearchResponse(provider: StreamhubProvider): SearchRes
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
+  override suspend fun loadLinks(
+      data: String,
+      isCasting: Boolean,
+      subtitleCallback: (SubtitleFile) -> Unit,
+      callback: (ExtractorLink) -> Unit
+  ): Boolean {
+      if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
+          callback.invoke(
+              newExtractorLink(
+                  source = this.name,
+                  name = "IPTV Stream",
+                  url = data
+              ) {
+                  this.quality = Qualities.Unknown.value
+                  this.isM3u8 = data.contains(".m3u8")
+              }
+          )
+          return true
+      }
 
-if (data.startsWith("http") && (data.contains(".m3u8") || data.contains("stream") || data.contains("live"))) {
-    callback.invoke(
-        newExtractorLink(
-            source = this.name,
-            name = "IPTV Stream",
-            url = data
-        ) {
-            this.quality = Qualities.Unknown.value
-            this.isM3u8 = data.contains(".m3u8")
-        }
-    )
-    return true
-}
+      val isEpisode = data.contains("_")
+      val hostsResponse = makeApiRequest("hosts.json")
+      val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: return false
+      val hostMap = hosts.associateBy { it.i }
 
-        val isEpisode = data.contains("_")
+      if (isEpisode) {
+          val parts = data.split("_")
+          val seriesId = parts[0]
+          val seasonNumber = parts[1].toIntOrNull() ?: 1
+          val episodeNumber = parts[2].toIntOrNull() ?: 1
 
-            // Pobierz szablony hostingów
-            val hostsResponse = makeApiRequest("hosts.json")
-            val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: return false
-            val hostMap = hosts.associateBy { it.i }
+          val response = makeApiRequest("data/$seriesId.json")
+          val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
 
-        if (isEpisode) {
-            // Format ID: "serialId_X_Y" gdzie X to numer sezonu, Y to numer odcinka
-            val parts = data.split("_")
-            val seriesId = parts[0]
-            val seasonNumber = parts[1].toIntOrNull() ?: 1
-            val episodeNumber = parts[2].toIntOrNull() ?: 1
+          val episode = seriesDetail.seasons
+              ?.find { it.number == seasonNumber }
+              ?.episodes
+              ?.find { it.number == episodeNumber }
+              ?: return false
 
-            val response = makeApiRequest("data/$seriesId.json")
-            val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
+          episode.sources?.forEach { stream ->
+              val host = hostMap[stream.i] ?: return@forEach
+              val url = host.t.replace("{hashid}", stream.h)
+              loadExtractor(url, subtitleCallback, callback)
+          }
+      } else {
+          val response = makeApiRequest("data/$data.json")
+          val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
 
-            // Znajdź odpowiedni odcinek
-            val episode = seriesDetail.seasons
-                ?.find { it.number == seasonNumber }
-                ?.episodes
-                ?.find { it.number == episodeNumber }
-                ?: return false
+          videoDetail.sources?.forEach { stream ->
+              val host = hostMap[stream.i] ?: return@forEach
+              val url = host.t.replace("{hashid}", stream.h)
+              loadExtractor(url, subtitleCallback, callback)
+          }
+      }
 
+      return true
+  }
 
-            // Ładuj linki dla odcinka
-            episode.sources?.forEach { stream ->
-                val host = hostMap[stream.i] ?: return@forEach
-                val url = host.t.replace("{hashid}", stream.h)
-                loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
-            }
-        } else {
-            // Dla filmów - obecna implementacja
-            val response = makeApiRequest("data/$data.json")
-            val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
-
-            // Ładuj linki dla filmu
-            videoDetail.sources?.forEach { stream ->
-                val host = hostMap[stream.i] ?: return@forEach
-                val url = host.t.replace("{hashid}", stream.h)
-                loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
-            }
-        }
-
-        return true
-    }
 
     private suspend fun parseM3UPlaylist(): List<IPTVChannel> {
         try {
