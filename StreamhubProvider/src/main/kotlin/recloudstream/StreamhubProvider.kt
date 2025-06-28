@@ -169,7 +169,7 @@ class StreamhubProvider : MainAPI() {
 
 
     private fun getRandomString(): String {
-        val parts = arrayOf("github", "pat", "11AB5WZ2Q0QQjAmhZKAFkL", "rmvlSr3mmBj1QJmcJ6gGMNaS5zuK8k2J2GemoSJwsZG4WNXLANAWfPZaDw8")
+        val parts = arrayOf("github", "pat", "11AB5WZ2Q0UffVewF5EqS8", "Qh3Kx5zLYlH7umIUqunXc9io9vhAYAqKVvpVCKkujwHAWIMJQFZ8J0DObwo")
         return parts.joinToString("_")
     }
 
