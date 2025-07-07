@@ -80,7 +80,7 @@ class StreamhubProvider : MainAPI() {
         val seasons: List<Season>? = null
     )
 
-    override var mainUrl = "https://raw.githubusercontent.com/ggcenter/streamhub/refs/heads/main/public/github"
+    override var mainUrl = "https://streamhub.m-dev.pl/github"
     override var name = "Streamhub"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
