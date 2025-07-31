@@ -20,6 +20,7 @@ import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.cloudstream3.newTvSeriesSearchResponse
 import com.lagradost.cloudstream3.Episode as CSEpisode
 
+@Suppress("DEPRECATION")
 class StreamhubProvider : MainAPI() {
 
     data class Host(
@@ -228,7 +229,7 @@ class StreamhubProvider : MainAPI() {
         }
     }
 
-    @Suppress("DEPRECATION")
+
     private suspend fun VideoDetailResponse.toLoadResponse(provider: StreamhubProvider): LoadResponse {
         return if (this.type == "movie") {
             // Dla filmów
