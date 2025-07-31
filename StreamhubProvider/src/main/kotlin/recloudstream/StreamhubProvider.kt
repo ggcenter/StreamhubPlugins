@@ -18,6 +18,7 @@ import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.cloudstream3.newTvSeriesSearchResponse
+import com.lagradost.cloudstream3.Episode as CSEpisode
 
 class StreamhubProvider : MainAPI() {
 
@@ -227,7 +228,7 @@ class StreamhubProvider : MainAPI() {
         }
     }
 
-
+    @Suppress("DEPRECATION")
     private suspend fun VideoDetailResponse.toLoadResponse(provider: StreamhubProvider): LoadResponse {
         return if (this.type == "movie") {
             // Dla filmów
@@ -258,13 +259,12 @@ class StreamhubProvider : MainAPI() {
                 TvType.TvSeries,
                 this.seasons?.flatMap { season ->
                     season.episodes?.map { episode ->
-                        provider.newEpisode(
-                            "${this.id}_${season.number}_${episode.number}"
-                        ) {
-                            this.name = episode.name
-                            this.season = season.number
-                            this.episode = episode.number
-                        }
+                        CSEpisode(
+                            "${this.id}_${season.number}_${episode.number}",
+                            episode.name,
+                            season.number,
+                            episode.number
+                        )
                     } ?: emptyList()
                 } ?: emptyList()
             ) {
