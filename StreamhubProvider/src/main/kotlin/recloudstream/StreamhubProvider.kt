@@ -260,12 +260,11 @@ class StreamhubProvider : MainAPI() {
                 TvType.TvSeries,
                 this.seasons?.flatMap { season ->
                     season.episodes?.map { episode ->
-                        Episode(
-                            data = "${this.id}_${season.number}_${episode.number}",
-                            name = episode.name,
-                            season = season.number,
-                            episode = episode.number
-                        )
+                        provider.newEpisode("${this.id}_${season.number}_${episode.number}") {
+                            this.name = episode.name
+                            this.season = season.number
+                            this.episode = episode.number
+                        }
                     } ?: emptyList()
                 } ?: emptyList()
             ) {
