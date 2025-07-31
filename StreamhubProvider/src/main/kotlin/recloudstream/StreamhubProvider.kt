@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package recloudstream
 
 import com.lagradost.cloudstream3.HomePageList
@@ -20,7 +22,7 @@ import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.cloudstream3.newTvSeriesSearchResponse
 import com.lagradost.cloudstream3.Episode as CSEpisode
 
-@Suppress("DEPRECATION")
+
 class StreamhubProvider : MainAPI() {
 
     data class Host(
