@@ -18,7 +18,7 @@ import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.Episode
+import com.lagradost.cloudstream3.newEpisode
 
 
 class StreamhubProvider : MainAPI() {
@@ -42,10 +42,10 @@ class StreamhubProvider : MainAPI() {
 
     data class Season(
         val number: Int,
-        val episodes: List<MyEpisode>
+        val episodes: List<Episode>
     )
 
-    data class MyEpisode(
+    data class Episode(
         val number: Int,
         val name: String? = null,
         val sources: List<Stream>? = null
@@ -260,7 +260,7 @@ class StreamhubProvider : MainAPI() {
                 TvType.TvSeries,
                 this.seasons?.flatMap { season ->
                     season.episodes?.map { episode ->
-                        provider.newEpisode("${this.id}_${season.number}_${episode.number}") {
+                        newEpisode("${this.id}_${season.number}_${episode.number}") {
                             this.name = episode.name
                             this.season = season.number
                             this.episode = episode.number
