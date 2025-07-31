@@ -80,7 +80,7 @@ class StreamhubProvider : MainAPI() {
         val seasons: List<Season>? = null
     )
 
-    override var mainUrl = "https://streamhub.m-dev.pl/github"
+    override var mainUrl = "https://streamhub.m-dev.pl/storage/github"
     override var name = "Streamhub"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
