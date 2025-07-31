@@ -18,7 +18,7 @@ import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.Episode as CSEpisode
+import com.lagradost.cloudstream3.newEpisode as CSEpisode
 
 class StreamhubProvider : MainAPI() {
 
