@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package recloudstream
 
 import com.lagradost.cloudstream3.HomePageList
@@ -20,7 +18,7 @@ import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.Episode as CSEpisode
+import com.lagradost.cloudstream3.Episode
 
 
 class StreamhubProvider : MainAPI() {
@@ -44,10 +42,10 @@ class StreamhubProvider : MainAPI() {
 
     data class Season(
         val number: Int,
-        val episodes: List<Episode>
+        val episodes: List<MyEpisode>
     )
 
-    data class Episode(
+    data class MyEpisode(
         val number: Int,
         val name: String? = null,
         val sources: List<Stream>? = null
@@ -262,11 +260,11 @@ class StreamhubProvider : MainAPI() {
                 TvType.TvSeries,
                 this.seasons?.flatMap { season ->
                     season.episodes?.map { episode ->
-                        CSEpisode(
-                            "${this.id}_${season.number}_${episode.number}",
-                            episode.name,
-                            season.number,
-                            episode.number
+                        Episode(
+                            data = "${this.id}_${season.number}_${episode.number}",
+                            name = episode.name,
+                            season = season.number,
+                            episode = episode.number
                         )
                     } ?: emptyList()
                 } ?: emptyList()
