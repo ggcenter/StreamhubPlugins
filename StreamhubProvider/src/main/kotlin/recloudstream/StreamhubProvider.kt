@@ -195,7 +195,7 @@ private suspend fun makeApiRequest(url: String): String {
 
     override suspend fun load(url: String): LoadResponse? {
 
-        val response = makeApiRequest(path)
+        val response = makeApiRequest(url)
         val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return null
 
         return videoDetail.toLoadResponse(this)
