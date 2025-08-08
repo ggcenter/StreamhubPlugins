@@ -98,7 +98,14 @@ class StreamhubProvider : MainAPI() {
 
 private suspend fun makeApiRequest(url: String): String {
     return try {
-        val fullUrl = "$mainUrl/$url"
+
+
+        val fullUrl = if (url.startsWith(mainUrl)) {
+            url
+        } else {
+            "$mainUrl/$url"
+        }
+
         Log.d("StreamhubProvider", "Wykonywanie żądania do: $fullUrl")
 
         val response = app.get(
@@ -187,15 +194,16 @@ private suspend fun makeApiRequest(url: String): String {
 
 
     override suspend fun load(url: String): LoadResponse? {
-     // Wyciągnij samo ID z pełnego URL
-         val videoId = if (url.contains("/")) {
-             url.substringAfterLast("/")
-         } else {
-             url
-         }
+        // Wyciągnij ścieżkę bez mainUrl
+        val path = if (url.startsWith(mainUrl)) {
+            url.removePrefix(mainUrl).removePrefix("/")
+        } else {
+            url.removePrefix("/")
+        }
 
-        val response = makeApiRequest("data/$videoId.json")
+        val response = makeApiRequest(path)
         val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return null
+
         return videoDetail.toLoadResponse(this)
     }
 
@@ -236,9 +244,9 @@ private suspend fun makeApiRequest(url: String): String {
             // Dla filmów
             provider.newMovieLoadResponse(
                 this.name,
-                this.id,
+                "/data/${this.id}.json",
                 TvType.Movie,
-                this.id
+                "/data/${this.id}.json"
             ) {
                 this.posterUrl = this@toLoadResponse.poster_path?.let {
                     provider.imageBaseUrl + it
@@ -261,7 +269,7 @@ private suspend fun makeApiRequest(url: String): String {
                 TvType.TvSeries,
                 this.seasons?.flatMap { season ->
                     season.episodes?.map { episode ->
-                        newEpisode("${this.id}_${season.number}_${episode.number}") {
+                        newEpisode("/data/${this.id}.json?season=${season.number}&episode=${episode.number}") {
                             this.name = episode.name
                             this.season = season.number
                             this.episode = episode.number
@@ -290,44 +298,62 @@ override suspend fun loadLinks(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    try {
-     val isEpisode = data.contains("_")
-     val hostsResponse = makeApiRequest("hosts.json")
-     val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: return false
-     val hostMap = hosts.associateBy { it.i }
 
-     if (isEpisode) {
-         val parts = data.split("_")
-         val seriesId = parts[0]
-         val seasonNumber = parts[1].toIntOrNull() ?: 1
-         val episodeNumber = parts[2].toIntOrNull() ?: 1
 
-         val response = makeApiRequest("data/$seriesId.json")
-         val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
+            // Pobierz szablony hostingów
+            val hostsResponse = makeApiRequest("hosts.json")
+            val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: return false
+            val hostMap = hosts.associateBy { it.i }
 
-         val episode = seriesDetail.seasons
-             ?.find { it.number == seasonNumber }
-             ?.episodes
-             ?.find { it.number == episodeNumber }
-             ?: return false
+        val isEpisode = data.contains("season=") && data.contains("episode=")
 
-         episode.sources?.forEach { stream ->
-             val host = hostMap[stream.i] ?: return@forEach
-             val streamUrl = host.t.replace("{hashid}", stream.h) // Zmieniona nazwa zmiennej
-             loadExtractor(streamUrl, subtitleCallback, callback)
-         }
-     } else {
-         val response = makeApiRequest("data/$data.json")
-         val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
 
-         videoDetail.sources?.forEach { stream ->
-             val host = hostMap[stream.i] ?: return@forEach
-             val streamUrl = host.t.replace("{hashid}", stream.h) // Zmieniona nazwa zmiennej
-             loadExtractor(streamUrl, subtitleCallback, callback)
-         }
-     }
+        if (isEpisode) {
+             // Format: "/data/SERIES_ID.json?season=X&episode=Y"
+             val pathPart = data.substringBefore("?")
+             val queryPart = data.substringAfter("?")
 
-     return true
+
+             // Parsuj parametry
+             val params = queryPart.split("&").associate {
+                 val (key, value) = it.split("=")
+                 key to value
+             }
+
+             val seasonNumber = params["season"]?.toIntOrNull() ?: return false
+             val episodeNumber = params["episode"]?.toIntOrNull() ?: return false
+
+            val response = makeApiRequest(data)
+            val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
+
+            // Znajdź odpowiedni odcinek
+            val episode = seriesDetail.seasons
+                ?.find { it.number == seasonNumber }
+                ?.episodes
+                ?.find { it.number == episodeNumber }
+                ?: return false
+
+
+            // Ładuj linki dla odcinka
+            episode.sources?.forEach { stream ->
+                val host = hostMap[stream.i] ?: return@forEach
+                val url = host.t.replace("{hashid}", stream.h)
+                loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
+            }
+        } else {
+            // Dla filmów - obecna implementacja
+            val response = makeApiRequest(data)
+            val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
+
+            // Ładuj linki dla filmu
+            videoDetail.sources?.forEach { stream ->
+                val host = hostMap[stream.i] ?: return@forEach
+                val url = host.t.replace("{hashid}", stream.h)
+                loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
+            }
+        }
+
+        return true
 }
 
 }
