@@ -284,56 +284,168 @@ class StreamhubProvider : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
+
+override suspend fun loadLinks(
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    try {
+        println("StreamhubProvider: loadLinks called with data: $data")
+
         val isEpisode = data.contains("_")
 
-            // Pobierz szablony hostingów
-            val hostsResponse = makeApiRequest("hosts.json")
-            val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: return false
-            val hostMap = hosts.associateBy { it.i }
+        // Pobierz szablony hostingów
+        val hostsResponse = makeApiRequest("hosts.json")
+        if (hostsResponse.isBlank()) {
+            println("StreamhubProvider: Pusta odpowiedź dla hosts.json")
+            return false
+        }
+
+        val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts
+        if (hosts.isNullOrEmpty()) {
+            println("StreamhubProvider: Nie udało się sparsować hostów")
+            return false
+        }
+
+        val hostMap = hosts.associateBy { it.i }
+        println("StreamhubProvider: Załadowano ${hostMap.size} hostów")
 
         if (isEpisode) {
             // Format ID: "serialId_X_Y" gdzie X to numer sezonu, Y to numer odcinka
             val parts = data.split("_")
+            if (parts.size < 3) {
+                println("StreamhubProvider: Nieprawidłowy format ID odcinka: $data")
+                return false
+            }
+
             val seriesId = parts[0]
-            val seasonNumber = parts[1].toIntOrNull() ?: 1
-            val episodeNumber = parts[2].toIntOrNull() ?: 1
+            val seasonNumber = parts[1].toIntOrNull()
+            val episodeNumber = parts[2].toIntOrNull()
+
+            if (seasonNumber == null || episodeNumber == null) {
+                println("StreamhubProvider: Nieprawidłowe numery sezonu/odcinka")
+                return false
+            }
+
+            println("StreamhubProvider: Ładowanie odcinka S${seasonNumber}E${episodeNumber} dla serialu $seriesId")
 
             val response = makeApiRequest("data/$seriesId.json")
-            val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
+            if (response.isBlank()) {
+                println("StreamhubProvider: Pusta odpowiedź dla serialu $seriesId")
+                return false
+            }
+
+            val seriesDetail = tryParseJson<VideoDetailResponse>(response)
+            if (seriesDetail == null) {
+                println("StreamhubProvider: Nie udało się sparsować danych serialu")
+                return false
+            }
 
             // Znajdź odpowiedni odcinek
-            val episode = seriesDetail.seasons
-                ?.find { it.number == seasonNumber }
-                ?.episodes
-                ?.find { it.number == episodeNumber }
-                ?: return false
+            val season = seriesDetail.seasons?.find { it.number == seasonNumber }
+            if (season == null) {
+                println("StreamhubProvider: Nie znaleziono sezonu $seasonNumber")
+                return false
+            }
 
+            val episode = season.episodes?.find { it.number == episodeNumber }
+            if (episode == null) {
+                println("StreamhubProvider: Nie znaleziono odcinka $episodeNumber w sezonie $seasonNumber")
+                return false
+            }
+
+            if (episode.sources.isNullOrEmpty()) {
+                println("StreamhubProvider: Brak źródeł dla odcinka")
+                return false
+            }
+
+            println("StreamhubProvider: Znaleziono ${episode.sources.size} źródeł dla odcinka")
 
             // Ładuj linki dla odcinka
-            episode.sources?.forEach { stream ->
-                val host = hostMap[stream.i] ?: return@forEach
+            var linksLoaded = false
+            episode.sources.forEach { stream ->
+                val host = hostMap[stream.i]
+                if (host == null) {
+                    println("StreamhubProvider: Nie znaleziono hosta dla ID: ${stream.i}")
+                    return@forEach
+                }
+
                 val url = host.t.replace("{hashid}", stream.h)
-                loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
+                println("StreamhubProvider: Próba ładowania URL: $url")
+
+                try {
+                    val success = loadExtractor(url, subtitleCallback, callback)
+                    if (success) {
+                        linksLoaded = true
+                        println("StreamhubProvider: Pomyślnie załadowano link z: $url")
+                    } else {
+                        println("StreamhubProvider: Nie udało się załadować linka z: $url")
+                    }
+                } catch (e: Exception) {
+                    println("StreamhubProvider: Błąd podczas ładowania linka z $url: ${e.message}")
+                }
             }
+
+            return linksLoaded
+
         } else {
-            // Dla filmów - obecna implementacja
+            // Dla filmów
+            println("StreamhubProvider: Ładowanie filmu $data")
+
             val response = makeApiRequest("data/$data.json")
-            val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
+            if (response.isBlank()) {
+                println("StreamhubProvider: Pusta odpowiedź dla filmu $data")
+                return false
+            }
+
+            val videoDetail = tryParseJson<VideoDetailResponse>(response)
+            if (videoDetail == null) {
+                println("StreamhubProvider: Nie udało się sparsować danych filmu")
+                return false
+            }
+
+            if (videoDetail.sources.isNullOrEmpty()) {
+                println("StreamhubProvider: Brak źródeł dla filmu")
+                return false
+            }
+
+            println("StreamhubProvider: Znaleziono ${videoDetail.sources.size} źródeł dla filmu")
 
             // Ładuj linki dla filmu
-            videoDetail.sources?.forEach { stream ->
-                val host = hostMap[stream.i] ?: return@forEach
+            var linksLoaded = false
+            videoDetail.sources.forEach { stream ->
+                val host = hostMap[stream.i]
+                if (host == null) {
+                    println("StreamhubProvider: Nie znaleziono hosta dla ID: ${stream.i}")
+                    return@forEach
+                }
+
                 val url = host.t.replace("{hashid}", stream.h)
-                loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
+                println("StreamhubProvider: Próba ładowania URL: $url")
+
+                try {
+                    val success = loadExtractor(url, subtitleCallback, callback)
+                    if (success) {
+                        linksLoaded = true
+                        println("StreamhubProvider: Pomyślnie załadowano link z: $url")
+                    } else {
+                        println("StreamhubProvider: Nie udało się załadować linka z: $url")
+                    }
+                } catch (e: Exception) {
+                    println("StreamhubProvider: Błąd podczas ładowania linka z $url: ${e.message}")
+                }
             }
+
+            return linksLoaded
         }
 
-        return true
+    } catch (e: Exception) {
+        println("StreamhubProvider: Krytyczny błąd w loadLinks: ${e.message}")
+        e.printStackTrace()
+        return false
     }
+}
+
 }
