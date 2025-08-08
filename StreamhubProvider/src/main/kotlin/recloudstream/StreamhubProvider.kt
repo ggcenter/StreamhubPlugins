@@ -194,12 +194,6 @@ private suspend fun makeApiRequest(url: String): String {
 
 
     override suspend fun load(url: String): LoadResponse? {
-        // Wyciągnij ścieżkę bez mainUrl
-        val path = if (url.startsWith(mainUrl)) {
-            url.removePrefix(mainUrl).removePrefix("/")
-        } else {
-            url.removePrefix("/")
-        }
 
         val response = makeApiRequest(path)
         val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return null
@@ -212,7 +206,7 @@ private suspend fun makeApiRequest(url: String): String {
         return if (this.type == "movie") {
             provider.newMovieSearchResponse(
                 this.name,
-                this.id,
+                "/data/${this.id}.json",
                 tvType
             ) {
                 this.posterUrl = this@toSearchResponse.poster_path?.let {
@@ -225,7 +219,7 @@ private suspend fun makeApiRequest(url: String): String {
         } else {
             provider.newTvSeriesSearchResponse(
                 this.name,
-                this.id,
+                "/data/${this.id}.json",
                 tvType
             ) {
                  this.posterUrl = this@toSearchResponse.poster_path?.let {
@@ -265,7 +259,7 @@ private suspend fun makeApiRequest(url: String): String {
             // Dla seriali
             provider.newTvSeriesLoadResponse(
                 this.name,
-                this.id,
+                "/data/${this.id}.json",
                 TvType.TvSeries,
                 this.seasons?.flatMap { season ->
                     season.episodes?.map { episode ->
