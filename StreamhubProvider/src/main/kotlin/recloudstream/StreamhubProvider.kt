@@ -342,7 +342,7 @@ override suspend fun loadLinks(
                 return@forEach
             }
             // 3) WAŻNE: kodujemy hashid
-            val url = host.t.replace("{hashid}", encodeUri(stream.h))
+            val url = host.t.replace("{hashid}", stream.h)
             if (loadExtractor(url, subtitleCallback, callback)) {
                 emitted++
             } else {
@@ -367,7 +367,7 @@ override suspend fun loadLinks(
                 Log.w("StreamhubProvider", "Nieznany host index=${stream.i}")
                 return@forEach
             }
-            val url = host.t.replace("{hashid}", encodeUri(stream.h))
+            val url = host.t.replace("{hashid}", stream.h)
             if (loadExtractor(url, subtitleCallback, callback)) {
                 emitted++
             } else {
