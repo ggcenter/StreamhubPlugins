@@ -51,10 +51,11 @@ class StreamhubProvider : MainAPI() {
         val sources: List<Stream>? = null
     )
 
-    data class Stream(
-        val i: Int,
-        val h: String
-    )
+data class Stream(
+    val i: Int,
+    val h: String,
+    val l: String? = null
+)
 
     data class VideoItem(
         val id: String,
@@ -100,17 +101,12 @@ private suspend fun makeApiRequest(url: String): String {
     return try {
 
 
-        val fullUrl = if (url.startsWith(mainUrl)) {
-            url
-        } else {
-            "$mainUrl/$url"
-        }
+        val fullUrl = if (url.startsWith("http")) url else "$mainUrl/${url.trimStart('/')}"
 
         Log.d("StreamhubProvider", "Wykonywanie żądania do: $fullUrl")
 
         val response = app.get(
-            fullUrl,
-            headers = mapOf("Authorization" to "Bearer $randomString")
+            fullUrl
         )
 
         if (!response.isSuccessful) {
@@ -286,68 +282,103 @@ private suspend fun makeApiRequest(url: String): String {
             }
         }
     }
+
+
 override suspend fun loadLinks(
     data: String,
     isCasting: Boolean,
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
+    // 1) Pobierz i zmapuj hosty
+    val hostsResponse = makeApiRequest("hosts.json")
+    val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: run {
+        Log.e("StreamhubProvider", "Brak/niepoprawne hosts.json")
+        return false
+    }
+    val hostMap = hosts.associateBy { it.i }
 
+    var emitted = 0
+    val isEpisode = data.contains("season=") && data.contains("episode=")
 
-            // Pobierz szablony hostingów
-            val hostsResponse = makeApiRequest("hosts.json")
-            val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: return false
-            val hostMap = hosts.associateBy { it.i }
+    if (isEpisode) {
+        // data: "/data/SERIES_ID.json?season=X&episode=Y"
+        val pathPart = data.substringBefore("?").ifBlank { data }
+        val queryPart = data.substringAfter("?", "")
 
-        val isEpisode = data.contains("season=") && data.contains("episode=")
+        val params = queryPart.split("&")
+            .mapNotNull {
+                val kv = it.split("=", limit = 2)
+                if (kv.size == 2) kv[0] to kv[1] else null
+            }.toMap()
 
-
-        if (isEpisode) {
-             // Format: "/data/SERIES_ID.json?season=X&episode=Y"
-             val pathPart = data.substringBefore("?")
-             val queryPart = data.substringAfter("?")
-
-
-             // Parsuj parametry
-             val params = queryPart.split("&").associate {
-                 val (key, value) = it.split("=")
-                 key to value
-             }
-
-             val seasonNumber = params["season"]?.toIntOrNull() ?: return false
-             val episodeNumber = params["episode"]?.toIntOrNull() ?: return false
-
-            val response = makeApiRequest(data)
-            val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
-
-            // Znajdź odpowiedni odcinek
-            val episode = seriesDetail.seasons
-                ?.find { it.number == seasonNumber }
-                ?.episodes
-                ?.find { it.number == episodeNumber }
-                ?: return false
-
-
-            // Ładuj linki dla odcinka
-            episode.sources?.forEach { stream ->
-                val host = hostMap[stream.i] ?: return@forEach
-                val url = host.t.replace("{hashid}", stream.h)
-                loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
-            }
-        } else {
-            // Dla filmów - obecna implementacja
-            val response = makeApiRequest(data)
-            val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return false
-
-            // Ładuj linki dla filmu
-            videoDetail.sources?.forEach { stream ->
-                val host = hostMap[stream.i] ?: return@forEach
-                val url = host.t.replace("{hashid}", stream.h)
-                loadExtractor(url, subtitleCallback, callback).takeIf { it } ?: return@forEach
-            }
+        val seasonNumber = params["season"]?.toIntOrNull()
+        val episodeNumber = params["episode"]?.toIntOrNull()
+        if (seasonNumber == null || episodeNumber == null) {
+            Log.e("StreamhubProvider", "Brak/niepoprawne parametry season/episode")
+            return false
         }
 
-        return true
+        // 2) Pobieramy czysty JSON bez query
+        val response = makeApiRequest(pathPart)
+        val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: run {
+            Log.e("StreamhubProvider", "Nie udało się sparsować JSON dla $pathPart")
+            return false
+        }
+
+        val episode = seriesDetail.seasons
+            ?.find { it.number == seasonNumber }
+            ?.episodes
+            ?.find { it.number == episodeNumber }
+
+        if (episode?.sources.isNullOrEmpty()) {
+            Log.w("StreamhubProvider", "Brak źródeł dla S$seasonNumber E$episodeNumber")
+            return false
+        }
+
+        episode!!.sources!!.forEach { stream ->
+            val host = hostMap[stream.i] ?: run {
+                Log.w("StreamhubProvider", "Nieznany host index=${stream.i}")
+                return@forEach
+            }
+            // 3) WAŻNE: kodujemy hashid
+            val url = host.t.replace("{hashid}", encodeUri(stream.h))
+            if (loadExtractor(url, subtitleCallback, callback)) {
+                emitted++
+            } else {
+                Log.w("StreamhubProvider", "Extractor nie zwrócił linków dla $url")
+            }
+        }
+    } else {
+        // Film
+        val response = makeApiRequest(data.substringBefore("?"))
+        val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: run {
+            Log.e("StreamhubProvider", "Nie udało się sparsować JSON dla ${data.substringBefore("?")}")
+            return false
+        }
+
+        if (videoDetail.sources.isNullOrEmpty()) {
+            Log.w("StreamhubProvider", "Brak źródeł w JSON (movie)")
+            return false
+        }
+
+        videoDetail.sources!!.forEach { stream ->
+            val host = hostMap[stream.i] ?: run {
+                Log.w("StreamhubProvider", "Nieznany host index=${stream.i}")
+                return@forEach
+            }
+            val url = host.t.replace("{hashid}", encodeUri(stream.h))
+            if (loadExtractor(url, subtitleCallback, callback)) {
+                emitted++
+            } else {
+                Log.w("StreamhubProvider", "Extractor nie zwrócił linków dla $url")
+            }
+        }
+    }
+
+    // Zwracamy prawdę tylko jeśli faktycznie coś wyemitowaliśmy
+    return emitted > 0
 }
+
 
 }
