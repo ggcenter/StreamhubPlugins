@@ -88,40 +88,35 @@ data class Stream(
 
     private val imageBaseUrl = "https://image.tmdb.org/t/p/original"
     private val imageDefaultUrl = "https://motivatevalmorgan.com/wp-content/uploads/2016/06/default-movie-1-3-476x700.jpg"
-    private val randomString = this.getRandomString()
 
     override var lang = "pl"
 
     override val hasMainPage = true
 
+    @Volatile
     private var searchCache: List<VideoItem>? = null
 
+    private suspend fun makeApiRequest(url: String): String {
+        return try {
+            val fullUrl = if (url.startsWith("http")) url else "$mainUrl/${url.trimStart('/')}"
 
-private suspend fun makeApiRequest(url: String): String {
-    return try {
+            Log.d("StreamhubProvider", "Wykonywanie żądania do: $fullUrl")
 
+            val response = app.get(fullUrl)
 
-        val fullUrl = if (url.startsWith("http")) url else "$mainUrl/${url.trimStart('/')}"
+            if (!response.isSuccessful) {
+                Log.e("StreamhubProvider", "Błąd HTTP ${response.code} dla URL: $fullUrl")
+                return ""
+            }
 
-        Log.d("StreamhubProvider", "Wykonywanie żądania do: $fullUrl")
-
-        val response = app.get(
-            fullUrl
-        )
-
-        if (!response.isSuccessful) {
-            Log.e("StreamhubProvider", "Błąd HTTP ${response.code} dla URL: $fullUrl")
-            return ""
+            val responseText = response.text
+            Log.d("StreamhubProvider", "Odpowiedź API (długość: ${responseText.length})")
+            responseText
+        } catch (e: Exception) {
+            Log.e("StreamhubProvider", "Błąd żądania API dla $url: ${e.message}", e)
+            ""
         }
-
-        val responseText = response.text
-        Log.d("StreamhubProvider", "Odpowiedź API (długość: ${responseText.length})")
-        responseText
-    } catch (e: Exception) {
-        Log.e("StreamhubProvider", "Błąd żądania API dla $url: ${e.message}", e)
-        ""
     }
-}
 
     override suspend fun search(query: String): List<SearchResponse> {
         try {
@@ -131,51 +126,40 @@ private suspend fun makeApiRequest(url: String): String {
 
                 // Sprawdź czy odpowiedź nie jest pusta
                 if (response.isBlank()) {
-                    println("StreamhubProvider: Pusta odpowiedź z API")
+                    Log.w("StreamhubProvider", "Pusta odpowiedź z API")
                     return emptyList()
                 }
 
                 // Logowanie długości odpowiedzi
-                println("StreamhubProvider: Długość odpowiedzi API: ${response.length}")
+                Log.d("StreamhubProvider", "Długość odpowiedzi API: ${response.length}")
 
                 // Sprawdź czy odpowiedź jest prawidłowym JSON
                 val parsedResponse = tryParseJson<VideoSearchResponse>(response)
                 if (parsedResponse == null) {
-                    println("StreamhubProvider: Nie udało się sparsować JSON")
+                    Log.e("StreamhubProvider", "Nie udało się sparsować JSON")
                     return emptyList()
                 }
 
                 // Sprawdź, czy lista nie jest pusta
-                if (parsedResponse.list.isNullOrEmpty()) {
-                    println("StreamhubProvider: Lista elementów jest pusta")
+                if (parsedResponse.list.isEmpty()) {
+                    Log.w("StreamhubProvider", "Lista elementów jest pusta")
                     return emptyList()
                 }
 
                 searchCache = parsedResponse.list
-                println("StreamhubProvider: Pomyślnie załadowano ${searchCache!!.size} elementów")
-            }
-
-            // Upewnij się, że searchCache nie jest null przed filtrowaniem
-            if (searchCache == null) {
-                return emptyList()
+                Log.d("StreamhubProvider", "Pomyślnie załadowano ${parsedResponse.list.size} elementów")
             }
 
             // Filtrowanie tytułów zawierających zapytanie
-            val filteredList = searchCache!!.filter { it.name.contains(query, ignoreCase = true) }
-            println("StreamhubProvider: Znaleziono ${filteredList.size} pasujących elementów")
+            val cache = searchCache ?: return emptyList()
+            val filteredList = cache.filter { it.name.contains(query, ignoreCase = true) }
+            Log.d("StreamhubProvider", "Znaleziono ${filteredList.size} pasujących elementów")
 
             return filteredList.map { it.toSearchResponse(this) }
         } catch (e: Exception) {
-            println("StreamhubProvider: Błąd w funkcji search: ${e.message}")
-            e.printStackTrace()
+            Log.e("StreamhubProvider", "Błąd w funkcji search: ${e.message}", e)
             return emptyList()
         }
-    }
-
-
-    private fun getRandomString(): String {
-        val parts = arrayOf("github", "pat", "11AB5WZ2Q0UffVewF5EqS8", "Qh3Kx5zLYlH7umIUqunXc9io9vhAYAqKVvpVCKkujwHAWIMJQFZ8J0DObwo")
-        return parts.joinToString("_")
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -208,9 +192,7 @@ private suspend fun makeApiRequest(url: String): String {
                 this.posterUrl = this@toSearchResponse.poster_path?.let {
                     provider.imageBaseUrl + it
                 } ?: provider.imageDefaultUrl
-                this.year = this@toSearchResponse.year?.let {
-                    it
-                }
+                this.year = this@toSearchResponse.year
             }
         } else {
             provider.newTvSeriesSearchResponse(
@@ -218,12 +200,10 @@ private suspend fun makeApiRequest(url: String): String {
                 "/data/${this.id}.json",
                 tvType
             ) {
-                 this.posterUrl = this@toSearchResponse.poster_path?.let {
-                     provider.imageBaseUrl + it
-                 } ?: provider.imageDefaultUrl
-                 this.year = this@toSearchResponse.year?.let {
-                     it
-                 }
+                this.posterUrl = this@toSearchResponse.poster_path?.let {
+                    provider.imageBaseUrl + it
+                } ?: provider.imageDefaultUrl
+                this.year = this@toSearchResponse.year
             }
         }
     }
@@ -244,12 +224,8 @@ private suspend fun makeApiRequest(url: String): String {
                 this.backgroundPosterUrl = this@toLoadResponse.backdrop_path?.let {
                     provider.imageBaseUrl + it
                 } ?: provider.imageDefaultUrl
-                 this.year = this@toLoadResponse.year?.let {
-                     it
-                 }
-                this.plot = this@toLoadResponse.overview?.let {
-                     it
-                }
+                this.year = this@toLoadResponse.year
+                this.plot = this@toLoadResponse.overview
             }
         } else {
             // Dla seriali
@@ -273,112 +249,110 @@ private suspend fun makeApiRequest(url: String): String {
                 this.backgroundPosterUrl = this@toLoadResponse.backdrop_path?.let {
                     provider.imageBaseUrl + it
                 } ?: provider.imageDefaultUrl
-                 this.year = this@toLoadResponse.year?.let {
-                     it
-                 }
-                this.plot = this@toLoadResponse.overview?.let {
-                     it
+                this.year = this@toLoadResponse.year
+                this.plot = this@toLoadResponse.overview
+            }
+        }
+    }
+
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        // 1) Pobierz i zmapuj hosty
+        val hostsResponse = makeApiRequest("hosts.json")
+        val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: run {
+            Log.e("StreamhubProvider", "Brak/niepoprawne hosts.json")
+            return false
+        }
+        val hostMap = hosts.associateBy { it.i }
+
+        var emitted = 0
+        val isEpisode = data.contains("season=") && data.contains("episode=")
+
+        if (isEpisode) {
+            // data: "/data/SERIES_ID.json?season=X&episode=Y"
+            val pathPart = data.substringBefore("?").ifBlank { data }
+            val queryPart = data.substringAfter("?", "")
+
+            val params = queryPart.split("&")
+                .mapNotNull {
+                    val kv = it.split("=", limit = 2)
+                    if (kv.size == 2) kv[0] to kv[1] else null
+                }.toMap()
+
+            val seasonNumber = params["season"]?.toIntOrNull()
+            val episodeNumber = params["episode"]?.toIntOrNull()
+            if (seasonNumber == null || episodeNumber == null) {
+                Log.e("StreamhubProvider", "Brak/niepoprawne parametry season/episode")
+                return false
+            }
+
+            // 2) Pobieramy czysty JSON bez query
+            val response = makeApiRequest(pathPart)
+            val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: run {
+                Log.e("StreamhubProvider", "Nie udało się sparsować JSON dla $pathPart")
+                return false
+            }
+
+            val episode = seriesDetail.seasons
+                ?.find { it.number == seasonNumber }
+                ?.episodes
+                ?.find { it.number == episodeNumber }
+
+            val sources = episode?.sources
+            if (sources.isNullOrEmpty()) {
+                Log.w("StreamhubProvider", "Brak źródeł dla S$seasonNumber E$episodeNumber")
+                return false
+            }
+
+            sources.forEach { stream ->
+                val host = hostMap[stream.i] ?: run {
+                    Log.w("StreamhubProvider", "Nieznany host index=${stream.i}")
+                    return@forEach
+                }
+                val url = host.t.replace("{hashid}", stream.h)
+                if (loadExtractor(url, subtitleCallback, callback)) {
+                    emitted++
+                } else {
+                    Log.w("StreamhubProvider", "Extractor nie zwrócił linków dla $url")
+                }
+            }
+        } else {
+            // Film
+            val pathPart = data.substringBefore("?")
+            val response = makeApiRequest(pathPart)
+            val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: run {
+                Log.e("StreamhubProvider", "Nie udało się sparsować JSON dla $pathPart")
+                return false
+            }
+
+            val sources = videoDetail.sources
+            if (sources.isNullOrEmpty()) {
+                Log.w("StreamhubProvider", "Brak źródeł w JSON (movie)")
+                return false
+            }
+
+            sources.forEach { stream ->
+                val host = hostMap[stream.i] ?: run {
+                    Log.w("StreamhubProvider", "Nieznany host index=${stream.i}")
+                    return@forEach
+                }
+                val url = host.t.replace("{hashid}", stream.h)
+                if (loadExtractor(url, subtitleCallback, callback)) {
+                    emitted++
+                } else {
+                    Log.w("StreamhubProvider", "Extractor nie zwrócił linków dla $url")
                 }
             }
         }
+
+        // Zwracamy prawdę tylko jeśli faktycznie coś wyemitowaliśmy
+        return emitted > 0
     }
-
-
-override suspend fun loadLinks(
-    data: String,
-    isCasting: Boolean,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-): Boolean {
-    // 1) Pobierz i zmapuj hosty
-    val hostsResponse = makeApiRequest("hosts.json")
-    val hosts = tryParseJson<HostsResponse>(hostsResponse)?.hosts ?: run {
-        Log.e("StreamhubProvider", "Brak/niepoprawne hosts.json")
-        return false
-    }
-    val hostMap = hosts.associateBy { it.i }
-
-    var emitted = 0
-    val isEpisode = data.contains("season=") && data.contains("episode=")
-
-    if (isEpisode) {
-        // data: "/data/SERIES_ID.json?season=X&episode=Y"
-        val pathPart = data.substringBefore("?").ifBlank { data }
-        val queryPart = data.substringAfter("?", "")
-
-        val params = queryPart.split("&")
-            .mapNotNull {
-                val kv = it.split("=", limit = 2)
-                if (kv.size == 2) kv[0] to kv[1] else null
-            }.toMap()
-
-        val seasonNumber = params["season"]?.toIntOrNull()
-        val episodeNumber = params["episode"]?.toIntOrNull()
-        if (seasonNumber == null || episodeNumber == null) {
-            Log.e("StreamhubProvider", "Brak/niepoprawne parametry season/episode")
-            return false
-        }
-
-        // 2) Pobieramy czysty JSON bez query
-        val response = makeApiRequest(pathPart)
-        val seriesDetail = tryParseJson<VideoDetailResponse>(response) ?: run {
-            Log.e("StreamhubProvider", "Nie udało się sparsować JSON dla $pathPart")
-            return false
-        }
-
-        val episode = seriesDetail.seasons
-            ?.find { it.number == seasonNumber }
-            ?.episodes
-            ?.find { it.number == episodeNumber }
-
-        if (episode?.sources.isNullOrEmpty()) {
-            Log.w("StreamhubProvider", "Brak źródeł dla S$seasonNumber E$episodeNumber")
-            return false
-        }
-
-        episode!!.sources!!.forEach { stream ->
-            val host = hostMap[stream.i] ?: run {
-                Log.w("StreamhubProvider", "Nieznany host index=${stream.i}")
-                return@forEach
-            }
-            // 3) WAŻNE: kodujemy hashid
-            val url = host.t.replace("{hashid}", stream.h)
-            if (loadExtractor(url, subtitleCallback, callback)) {
-                emitted++
-            } else {
-                Log.w("StreamhubProvider", "Extractor nie zwrócił linków dla $url")
-            }
-        }
-    } else {
-        // Film
-        val response = makeApiRequest(data.substringBefore("?"))
-        val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: run {
-            Log.e("StreamhubProvider", "Nie udało się sparsować JSON dla ${data.substringBefore("?")}")
-            return false
-        }
-
-        if (videoDetail.sources.isNullOrEmpty()) {
-            Log.w("StreamhubProvider", "Brak źródeł w JSON (movie)")
-            return false
-        }
-
-        videoDetail.sources!!.forEach { stream ->
-            val host = hostMap[stream.i] ?: run {
-                Log.w("StreamhubProvider", "Nieznany host index=${stream.i}")
-                return@forEach
-            }
-            val url = host.t.replace("{hashid}", stream.h)
-            if (loadExtractor(url, subtitleCallback, callback)) {
-                emitted++
-            } else {
-                Log.w("StreamhubProvider", "Extractor nie zwrócił linków dla $url")
-            }
-        }
-    }
-
-    // Zwracamy prawdę tylko jeśli faktycznie coś wyemitowaliśmy
-    return emitted > 0
-}
 
 
 }
